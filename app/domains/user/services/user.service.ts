@@ -17,12 +17,40 @@ export class UserService {
     return user
   }
 
-  async update(id: number, fullName: string): Promise<User | null> {
+  async get_by_email(email: string): Promise<User | null> {
+    const user = await User.findBy('email', email)
+    if (!user) {
+      return null
+    }
+    return user
+  }
+
+  async update(id: number, fullName: string): Promise<User> {
     const user = await User.find(id)
     if (!user) {
       throw new UserNotFoundException('User not found')
     }
     user.fullName = fullName
+    await user.save()
+    return user
+  }
+
+  async update_code(id: number, code: string): Promise<User> {
+    const user = await User.find(id)
+    if (!user) {
+      throw new UserNotFoundException('User not found')
+    }
+    user.code = code
+    await user.save()
+    return user
+  }
+
+  async update_attempt(id: number, attempt: number): Promise<User> {
+    const user = await User.find(id)
+    if (!user) {
+      throw new UserNotFoundException('User not found')
+    }
+    user.attempt = attempt
     await user.save()
     return user
   }
