@@ -7,7 +7,7 @@ This project follows Domain-Driven Design principles with a modular architecture
 ## Directory Structure
 
 ```
-src/
+app/
 ├── domains/
 │   ├── {DOMAIN}/
 │   │   ├── models/          # Domain entities and value objects
@@ -21,36 +21,42 @@ src/
 ## Layer Responsibilities
 
 ### models/
+
 - Domain entities representing core business objects
 - Value objects for immutable domain concepts
 - Aggregate roots that maintain consistency boundaries
 - Domain events
 
 ### services/
+
 - Business logic and use cases
 - Domain services for operations that don't belong to a single entity
 - Application services orchestrating domain operations
 - Transaction management
 
 ### controllers/
+
 - HTTP request/response handling
 - Route definitions
 - Request parsing and response formatting
 - Delegation to services
 
 ### validators/
+
 - Input validation schemas
 - Request validation logic
 - Data sanitization
 - Validation rules and constraints
 
 ### adapters/
+
 - Repository implementations for data persistence
 - External API clients
 - Third-party service integrations
 - Infrastructure adapters (email, SMS, payment gateways)
 
 ### exceptions/
+
 - Domain-specific error types
 - Business rule violation exceptions
 - Custom error handling
