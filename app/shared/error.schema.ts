@@ -2,6 +2,7 @@ import vine from '@vinejs/vine'
 
 export const ErrorResponseSchema = vine.compile(
   vine.object({
+    name: vine.string(),
     message: vine.string(),
     code: vine.string(),
   })
