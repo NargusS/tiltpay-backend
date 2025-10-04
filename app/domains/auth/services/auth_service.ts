@@ -7,6 +7,7 @@ import { MissmatchCodeException } from '../exceptions/missmatch_code.exception.j
 import { TooManyAttemptsException } from '../exceptions/too_many_attempt.exception.js'
 import { UserNotVerifiedException } from '#domains/user/exceptions/user_not_verified.exception'
 import { UnabledToVerifyException } from '../exceptions/unabled_to_verify.exception.js'
+import hash from '@adonisjs/core/services/hash'
 
 @inject()
 export default class AuthService {
@@ -23,7 +24,8 @@ export default class AuthService {
     if (user.attempt >= 3) {
       throw new TooManyAttemptsException()
     }
-    if (user.code !== code) {
+    const verified = await hash.verify(user.code, code)
+    if (!verified) {
       await this.user_service.update_attempt(user.id, user.attempt + 1)
       throw new MissmatchCodeException()
     }
