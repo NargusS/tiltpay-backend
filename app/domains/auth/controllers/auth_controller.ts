@@ -15,14 +15,19 @@ import {
   LogoutResponseSchema,
   VerifyAccountResponseSchema,
 } from '#domains/auth/validators/response'
-import { ErrorResponseSchema } from '#shared/error.schema'
-import { InvalidCredentialsException } from '../exceptions/invalid_credentials.exception.js'
-import { UnabledToVerifyException } from '../exceptions/unabled_to_verify.exception.js'
+import { ErrorResponseSchema, ValidationErrorResponseSchema } from '#shared/error.schema'
+import { InvalidCredentialsException } from '#domains/user/exceptions/invalid_credentials.exception'
+import { UnabledToVerifyException } from '#domains/auth/exceptions/unabled_to_verify.exception'
 
 @ApiResponse({
   status: 500,
   description: 'Internal server error',
   type: () => ErrorResponseSchema,
+})
+@ApiResponse({
+  status: 422,
+  description: 'Validation error',
+  type: () => ValidationErrorResponseSchema,
 })
 @inject()
 export default class AuthController {
@@ -104,6 +109,11 @@ export default class AuthController {
   @ApiResponse({
     status: 412,
     description: 'Code does not match',
+    type: () => ErrorResponseSchema,
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'Validation error',
     type: () => ErrorResponseSchema,
   })
   async createAccount({ request, response }: HttpContext) {
