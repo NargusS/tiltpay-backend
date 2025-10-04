@@ -2,6 +2,8 @@ import env from '#start/env'
 import { GridClient } from '@sqds/grid'
 import Wallet from '#domains/wallet/models/wallet.model'
 import { WalletNotFoundException } from '../exceptions/wallet_not_found.exception.js'
+import { Keypair } from '@solana/web3.js'
+import { WrongAccountTypeException } from '../exceptions/wrong_account_type.exception.js'
 
 export interface TokenBalance {
   mint: string
@@ -28,33 +30,36 @@ export class WalletService {
     })
   }
 
-  async create(user_id: number) {
-    const sessionSecrets = await this.client.generateSessionSecrets()
-    const bulk = sessionSecrets.map((secret) => ({
-      publicKey: secret.publicKey,
-      privateKey: secret.privateKey,
-      user_id: user_id,
-      provider: secret.provider,
-      tag: secret.tag,
-    }))
-    await Wallet.createMany(bulk)
-    return {
-      success: true,
-      message: 'Wallet created successfully',
-      data: bulk,
+  async create(user_id: number): Promise<Wallet> {
+    const primaryKey = Keypair.generate()
+    const account = await this.client.createAccount({
+      signer: primaryKey.publicKey.toBase58(),
+    })
+    if (account.type !== 'signers') {
+      throw new WrongAccountTypeException()
     }
+    const wallet = await Wallet.create({
+      publicKey: primaryKey.publicKey.toBase58(),
+      privateKey: primaryKey.secretKey.toString(),
+      userId: user_id,
+      provider: 'solana',
+      tag: 'primary',
+      address: account.address,
+      gridUserId: account.grid_user_id,
+    })
+    return wallet
   }
 
   async get_balance(user_id: number) {
     const wallet = await Wallet.query()
       .where('user_id', user_id)
-      .where('provider', 'primary')
+      .where('provider', 'solana')
+      .where('tag', 'primary')
       .first()
     if (!wallet) {
       throw new WalletNotFoundException()
     }
-    const balance = await this.client.getAccountBalances(wallet.publicKey)
-    // !TODO this.client.createAccount() https://developers.squads.so/grid/v1/accounts/authentication-methods
+    const balance = await this.client.getAccountBalances(wallet.address)
     return balance as unknown as WalletBalance
   }
 

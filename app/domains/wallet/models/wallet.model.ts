@@ -22,6 +22,12 @@ export default class Wallet extends BaseModel {
   @column()
   declare tag: string
 
+  @column({ columnName: 'grid_user_id' })
+  declare gridUserId: string
+
+  @column()
+  declare address: string
+
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
 
