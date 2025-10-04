@@ -54,6 +54,15 @@ export class WalletService {
       throw new WalletNotFoundException()
     }
     const balance = await this.client.getAccountBalances(wallet.publicKey)
+    // !TODO this.client.createAccount() https://developers.squads.so/grid/v1/accounts/authentication-methods
     return balance as unknown as WalletBalance
+  }
+
+  async transfer(user_id: number, amount: number, to_address: string) {
+    throw new Error(`Not implemented: transfer from ${user_id} to ${to_address} amount ${amount}`)
+  }
+
+  async transfer_with_tag(user_id: number, amount: number, to_tag: string) {
+    throw new Error(`Not implemented: transfer from ${user_id} to ${to_tag} amount ${amount}`)
   }
 }
