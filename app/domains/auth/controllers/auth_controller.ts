@@ -1,15 +1,14 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import AuthService from '#domains/auth/services/auth_service'
-import { loginValidator } from '#domains/auth/validators/login_validator'
-import { createAccountValidator } from '#domains/auth/validators/create_account_validator'
+import { LoginValidator } from '#domains/auth/validators/login_validator'
+import { CreateAccountValidator } from '#domains/auth/validators/create_account_validator'
 import { inject } from '@adonisjs/core'
 import { UserNotFoundException } from '#domains/user/exceptions/user_not_found.exception'
 import { TooManyAttemptsException } from '#domains/auth/exceptions/too_many_attempt.exception'
 import { UserNotVerifiedException } from '#domains/user/exceptions/user_not_verified.exception'
-import { MissmatchCodeException } from '#domains/auth/exceptions/missmatch_code.exception'
 import { UserAlreadyExistsException } from '#domains/user/exceptions/user_already_exist.exception'
-import { verifyAccountValidator } from '#domains/auth/validators/verify_account.validator'
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@foadonis/openapi/decorators'
+import { VerifyAccountValidator } from '#domains/auth/validators/verify_account.validator'
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse } from '@foadonis/openapi/decorators'
 import {
   CreateAccountResponseSchema,
   LoginResponseSchema,
@@ -32,6 +31,9 @@ export default class AuthController {
   @ApiOperation({
     summary: 'Login',
     description: 'Login to account',
+  })
+  @ApiBody({
+    type: () => LoginValidator,
   })
   @ApiResponse({
     status: 200,
@@ -60,7 +62,7 @@ export default class AuthController {
   })
   async login({ auth, request, response }: HttpContext) {
     try {
-      const { phoneNumber, code } = await request.validateUsing(loginValidator)
+      const { phoneNumber, code } = await request.validateUsing(LoginValidator)
       const user = await this.auth_service.login(phoneNumber, code)
       const generatedToken = await auth.use('api').createToken(user)
       const token = generatedToken.value!.release()
@@ -86,6 +88,9 @@ export default class AuthController {
     summary: 'Create account',
     description: 'Create a new account',
   })
+  @ApiBody({
+    type: () => CreateAccountValidator,
+  })
   @ApiResponse({
     status: 201,
     description: 'Account created successfully',
@@ -103,15 +108,12 @@ export default class AuthController {
   })
   async createAccount({ request, response }: HttpContext) {
     try {
-      const { email, fullName, tagName, code, confirmCode } =
-        await request.validateUsing(createAccountValidator)
-      await this.auth_service.createAccount(email, fullName, tagName, code, confirmCode)
+      const { phoneNumber, fullName, tagName, code } =
+        await request.validateUsing(CreateAccountValidator)
+      await this.auth_service.createAccount(phoneNumber, fullName, tagName, code)
       return response.status(201).json({ message: 'Account created successfully' })
     } catch (error) {
       if (error instanceof UserAlreadyExistsException) {
-        return response.status(error.status).json(error)
-      }
-      if (error instanceof MissmatchCodeException) {
         return response.status(error.status).json(error)
       }
       return response.status(error.status).json(error)
@@ -121,6 +123,9 @@ export default class AuthController {
   @ApiOperation({
     summary: 'Verify account',
     description: 'Verify account with otp code phone',
+  })
+  @ApiBody({
+    type: () => VerifyAccountValidator,
   })
   @ApiResponse({
     status: 200,
@@ -139,7 +144,7 @@ export default class AuthController {
   })
   async verifyAccount({ request, response }: HttpContext) {
     try {
-      const { phoneNumber, token } = await request.validateUsing(verifyAccountValidator)
+      const { phoneNumber, token } = await request.validateUsing(VerifyAccountValidator)
       await this.auth_service.verifyAccount(phoneNumber, token)
       return response.status(200).json({ message: 'Account verified successfully' })
     } catch (error) {

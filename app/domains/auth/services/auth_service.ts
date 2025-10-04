@@ -31,19 +31,10 @@ export default class AuthService {
     return user
   }
 
-  async createAccount(
-    phoneNumber: string,
-    fullName: string,
-    tagName: string,
-    code: string,
-    confirmCode: string
-  ) {
+  async createAccount(phoneNumber: string, fullName: string, tagName: string, code: string) {
     const user = await this.user_service.get_by_phone_number(phoneNumber)
     if (user) {
       throw new UserAlreadyExistsException()
-    }
-    if (code !== confirmCode) {
-      throw new MissmatchCodeException()
     }
     const verificationCode = Math.floor(100000 + Math.random() * 900000) // 6 digits 000000 - 999999
     const newUser = await this.user_service.create(

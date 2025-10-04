@@ -1,8 +1,8 @@
 import vine from '@vinejs/vine'
 
-export const verifyAccountValidator = vine.compile(
+export const VerifyAccountValidator = vine.compile(
   vine.object({
-    phoneNumber: vine.string(),
+    phoneNumber: vine.string().minLength(10).maxLength(10),
     token: vine.string(),
   })
 )
