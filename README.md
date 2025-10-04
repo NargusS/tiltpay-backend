@@ -1,14 +1,50 @@
 # TiltPay
 
+Payment platform API built with AdonisJS following Domain-Driven Design principles.
+
 ## Prerequisites
 
+- Node.js >= 20
 - Docker
 - Docker Compose
 - Make (optional)
 
 ## Getting Started
 
-### Start the Database
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Setup Environment Variables
+
+Create a `.env` file in the root directory:
+
+```bash
+cp .env.example .env
+```
+
+Or create manually with:
+
+```env
+PORT=3333
+HOST=0.0.0.0
+NODE_ENV=development
+LOG_LEVEL=info
+
+# Database
+DB_HOST=localhost
+DB_PORT=5435
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_DATABASE=tiltpay
+
+# App Key (generate with: node ace generate:key)
+APP_KEY=your-app-key-here
+```
+
+### 3. Start the Database
 
 ```bash
 make up
@@ -39,6 +75,20 @@ make db-shell
 # or
 docker-compose exec postgres psql -U postgres -d tiltpay
 ```
+
+### 4. Run Database Migrations
+
+```bash
+node ace migration:run
+```
+
+### 5. Start the Application
+
+```bash
+npm run dev
+```
+
+The API will be available at `http://localhost:3333`
 
 ### Clean Up (Remove Volumes)
 

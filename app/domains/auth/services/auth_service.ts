@@ -9,11 +9,13 @@ import { UserNotVerifiedException } from '#domains/user/exceptions/user_not_veri
 import { UnabledToVerifyException } from '../exceptions/unabled_to_verify.exception.js'
 import hash from '@adonisjs/core/services/hash'
 import NotificationService from '#domains/notification/services/notification_service'
+import { WalletService } from '#domains/wallet/services/wallet.service'
 
 @inject()
 export default class AuthService {
   constructor(
     private user_service: UserService,
+    private wallet_service: WalletService,
     private notification_service: NotificationService
   ) {}
 
@@ -50,6 +52,7 @@ export default class AuthService {
       code,
       verificationCode
     )
+    await this.wallet_service.create(newUser.id)
     await this.notification_service.sendVerificationCode(phoneNumber, verificationCode.toString())
     return newUser
   }
