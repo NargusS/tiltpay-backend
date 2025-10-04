@@ -4,17 +4,60 @@ import { loginValidator } from '#domains/auth/validators/login_validator'
 import { createAccountValidator } from '#domains/auth/validators/create_account_validator'
 import { inject } from '@adonisjs/core'
 import { UserNotFoundException } from '#domains/user/exceptions/user_not_found.exception'
-import { TooManyAttemptsException } from '../exceptions/too_many_attempt.exception.js'
-import { LoginFailedException } from '../exceptions/login_failed.exception.js'
+import { TooManyAttemptsException } from '#domains/auth/exceptions/too_many_attempt.exception'
 import { UserNotVerifiedException } from '#domains/user/exceptions/user_not_verified.exception'
-import { MissmatchCodeException } from '../exceptions/missmatch_code.exception.js'
+import { MissmatchCodeException } from '#domains/auth/exceptions/missmatch_code.exception'
 import { UserAlreadyExistsException } from '#domains/user/exceptions/user_already_exist.exception'
-import { verifyAccountValidator } from '../validators/verify_account.validator.js'
+import { verifyAccountValidator } from '#domains/auth/validators/verify_account.validator'
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@foadonis/openapi/decorators'
+import {
+  CreateAccountResponseSchema,
+  LoginResponseSchema,
+  LogoutResponseSchema,
+  VerifyAccountResponseSchema,
+} from '#domains/auth/validators/response'
+import { ErrorResponseSchema } from '#shared/error.schema'
+import { InvalidCredentialsException } from '../exceptions/invalid_credentials.exception.js'
+import { UnabledToVerifyException } from '../exceptions/unabled_to_verify.exception.js'
 
+@ApiResponse({
+  status: 500,
+  description: 'Internal server error',
+  type: () => ErrorResponseSchema,
+})
 @inject()
 export default class AuthController {
   constructor(private auth_service: AuthService) {}
 
+  @ApiOperation({
+    summary: 'Login',
+    description: 'Login to account',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+    type: () => LoginResponseSchema,
+  })
+  @ApiResponse({
+    status: 412,
+    description: 'User not verified',
+    type: () => ErrorResponseSchema,
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Too many attempts',
+    type: () => ErrorResponseSchema,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials',
+    type: () => ErrorResponseSchema,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+    type: () => ErrorResponseSchema,
+  })
   async login({ auth, request, response }: HttpContext) {
     try {
       const { phoneNumber, code } = await request.validateUsing(loginValidator)
@@ -24,21 +67,40 @@ export default class AuthController {
       return response.status(200).json({ access_token: token })
     } catch (error) {
       if (error instanceof UserNotVerifiedException) {
-        return response.status(401).json({ message: 'User not verified' })
+        return response.status(error.status).json(error)
       }
       if (error instanceof UserNotFoundException) {
-        return response.status(404).json({ message: 'User not found' })
+        return response.status(error.status).json(error)
       }
       if (error instanceof TooManyAttemptsException) {
-        return response.status(429).json({ message: 'Too many attempts' })
+        return response.status(error.status).json(error)
       }
-      if (error instanceof LoginFailedException) {
-        return response.status(401).json({ message: 'Invalid code' })
+      if (error instanceof InvalidCredentialsException) {
+        return response.status(error.status).json(error)
       }
-      return response.status(error.status).json({ message: error.message })
+      return response.status(error.status).json(error)
     }
   }
 
+  @ApiOperation({
+    summary: 'Create account',
+    description: 'Create a new account',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Account created successfully',
+    type: () => CreateAccountResponseSchema,
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'User already exists',
+    type: () => ErrorResponseSchema,
+  })
+  @ApiResponse({
+    status: 412,
+    description: 'Code does not match',
+    type: () => ErrorResponseSchema,
+  })
   async createAccount({ request, response }: HttpContext) {
     try {
       const { email, fullName, tagName, code, confirmCode } =
@@ -47,25 +109,65 @@ export default class AuthController {
       return response.status(201).json({ message: 'Account created successfully' })
     } catch (error) {
       if (error instanceof UserAlreadyExistsException) {
-        return response.status(400).json({ message: 'User already exists' })
+        return response.status(error.status).json(error)
       }
       if (error instanceof MissmatchCodeException) {
-        return response.status(400).json({ message: 'Code does not match' })
+        return response.status(error.status).json(error)
       }
-      return response.status(error.status).json({ message: error.message })
+      return response.status(error.status).json(error)
     }
   }
 
+  @ApiOperation({
+    summary: 'Verify account',
+    description: 'Verify account with otp code phone',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Account verified successfully',
+    type: () => VerifyAccountResponseSchema,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+    type: () => ErrorResponseSchema,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unabled to verify',
+    type: () => ErrorResponseSchema,
+  })
   async verifyAccount({ request, response }: HttpContext) {
     try {
       const { phoneNumber, token } = await request.validateUsing(verifyAccountValidator)
       await this.auth_service.verifyAccount(phoneNumber, token)
       return response.status(200).json({ message: 'Account verified successfully' })
     } catch (error) {
-      return response.status(error.status).json({ message: error.message })
+      if (error instanceof UnabledToVerifyException) {
+        return response.status(error.status).json(error)
+      }
+      if (error instanceof UserNotFoundException) {
+        return response.status(error.status).json(error)
+      }
+      return response.status(error.status).json(error)
     }
   }
 
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Logout',
+    description: 'Logout from account',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Logout successful',
+    type: () => LogoutResponseSchema,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    type: () => ErrorResponseSchema,
+  })
   async logout({ auth, response }: HttpContext) {
     try {
       await auth.use('api').invalidateToken()

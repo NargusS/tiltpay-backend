@@ -1,7 +1,6 @@
 import { UserNotFoundException } from '#domains/user/exceptions/user_not_found.exception'
 import { UserService } from '#domains/user/services/user.service'
 import { inject } from '@adonisjs/core'
-import { LoginFailedException } from '../exceptions/login_failed.exception.js'
 import User from '#domains/user/models/user'
 import { UserAlreadyExistsException } from '#domains/user/exceptions/user_already_exist.exception'
 import { MissmatchCodeException } from '../exceptions/missmatch_code.exception.js'
@@ -26,7 +25,7 @@ export default class AuthService {
     }
     if (user.code !== code) {
       await this.user_service.update_attempt(user.id, user.attempt + 1)
-      throw new LoginFailedException()
+      throw new MissmatchCodeException()
     }
     await this.user_service.update_attempt(user.id, 0)
     return user

@@ -8,9 +8,18 @@
 */
 
 import router from '@adonisjs/core/services/router'
+import openapi from '@foadonis/openapi/services/main'
+import { middleware } from './kernel.js'
 
-router.get('/', async () => {
-  return {
-    hello: 'world',
-  }
-})
+openapi.registerRoutes()
+
+const AuthController = () => import('#domains/auth/controllers/auth_controller')
+
+router
+  .group(() => {
+    router.post('/login', [AuthController, 'login'])
+    router.post('/create-account', [AuthController, 'createAccount'])
+    router.post('/verify-account', [AuthController, 'verifyAccount'])
+    router.post('/logout', [AuthController, 'logout']).use(middleware.auth())
+  })
+  .prefix('auth')
