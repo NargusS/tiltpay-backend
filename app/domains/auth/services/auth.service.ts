@@ -8,7 +8,7 @@ import { TooManyAttemptsException } from '../exceptions/too_many_attempt.excepti
 import { UserNotVerifiedException } from '#domains/user/exceptions/user_not_verified.exception'
 import { UnabledToVerifyException } from '../exceptions/unabled_to_verify.exception.js'
 import hash from '@adonisjs/core/services/hash'
-import NotificationService from '#domains/notification/services/notification_service'
+import NotificationService from '#domains/notification/services/notification.service'
 import { WalletService } from '#domains/wallet/services/wallet.service'
 
 @inject()
