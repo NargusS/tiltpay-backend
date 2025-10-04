@@ -8,10 +8,14 @@ import { TooManyAttemptsException } from '../exceptions/too_many_attempt.excepti
 import { UserNotVerifiedException } from '#domains/user/exceptions/user_not_verified.exception'
 import { UnabledToVerifyException } from '../exceptions/unabled_to_verify.exception.js'
 import hash from '@adonisjs/core/services/hash'
+import NotificationService from '#domains/notification/services/notification_service'
 
 @inject()
 export default class AuthService {
-  constructor(private user_service: UserService) {}
+  constructor(
+    private user_service: UserService,
+    private notification_service: NotificationService
+  ) {}
 
   async login(phoneNumber: string, code: string): Promise<User> {
     const user = await this.user_service.get_by_phone_number(phoneNumber)
@@ -46,6 +50,7 @@ export default class AuthService {
       code,
       verificationCode
     )
+    await this.notification_service.sendVerificationCode(phoneNumber, verificationCode.toString())
     return newUser
   }
 
