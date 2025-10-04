@@ -9,6 +9,7 @@ import { LoginFailedException } from '../exceptions/login_failed.exception.js'
 import { UserNotVerifiedException } from '#domains/user/exceptions/user_not_verified.exception'
 import { MissmatchCodeException } from '../exceptions/missmatch_code.exception.js'
 import { UserAlreadyExistsException } from '#domains/user/exceptions/user_already_exist.exception'
+import { verifyAccountValidator } from '../validators/verify_account.validator.js'
 
 @inject()
 export default class AuthController {
@@ -16,8 +17,8 @@ export default class AuthController {
 
   async login({ auth, request, response }: HttpContext) {
     try {
-      const { email, code } = await request.validateUsing(loginValidator)
-      const user = await this.auth_service.login(email, code)
+      const { phoneNumber, code } = await request.validateUsing(loginValidator)
+      const user = await this.auth_service.login(phoneNumber, code)
       const generatedToken = await auth.use('api').createToken(user)
       const token = generatedToken.value!.release()
       return response.status(200).json({ access_token: token })
@@ -55,9 +56,22 @@ export default class AuthController {
     }
   }
 
-  async logout({ response }: HttpContext) {
-    // TODO: Implement logout logic
-    await this.auth_service.logout()
-    return response.status(200).json({ message: 'Logout successful' })
+  async verifyAccount({ request, response }: HttpContext) {
+    try {
+      const { phoneNumber, token } = await request.validateUsing(verifyAccountValidator)
+      await this.auth_service.verifyAccount(phoneNumber, token)
+      return response.status(200).json({ message: 'Account verified successfully' })
+    } catch (error) {
+      return response.status(error.status).json({ message: error.message })
+    }
+  }
+
+  async logout({ auth, response }: HttpContext) {
+    try {
+      await auth.use('api').invalidateToken()
+      return response.status(200).json({ message: 'Logout successful' })
+    } catch (error) {
+      return response.status(error.status).json({ message: error.message })
+    }
   }
 }

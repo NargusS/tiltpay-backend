@@ -4,8 +4,20 @@ import { UserNotFoundException } from '#domains/user/exceptions/user_not_found.e
 export class UserService {
   constructor() {}
 
-  async create(fullName: string, tagname: string, email: string, code: string) {
-    const user = await User.create({ fullName, tagname, email, code })
+  async create(
+    fullName: string,
+    tagname: string,
+    phoneNumber: string,
+    code: string,
+    verificationCode: number
+  ) {
+    const user = await User.create({
+      fullName,
+      tagname,
+      phoneNumber,
+      code,
+      verificationToken: verificationCode.toString(),
+    })
     return user
   }
 
@@ -17,8 +29,8 @@ export class UserService {
     return user
   }
 
-  async get_by_email(email: string): Promise<User | null> {
-    const user = await User.findBy('email', email)
+  async get_by_phone_number(phoneNumber: string): Promise<User | null> {
+    const user = await User.findBy('phoneNumber', phoneNumber)
     if (!user) {
       return null
     }

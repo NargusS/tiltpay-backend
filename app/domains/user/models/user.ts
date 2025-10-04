@@ -7,7 +7,7 @@ import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 
 const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
   uids: ['email'],
-  passwordColumnName: 'password',
+  passwordColumnName: 'code',
 })
 
 export default class User extends compose(BaseModel, AuthFinder) {
@@ -20,14 +20,17 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare tagname: string
 
-  @column()
-  declare email: string
+  @column({ columnName: 'phone_number' })
+  declare phoneNumber: string
 
   @column({ serializeAs: null })
   declare code: string
 
   @column()
   declare verified: boolean
+
+  @column()
+  declare verificationToken: string | null
 
   @column()
   declare attempt: number
