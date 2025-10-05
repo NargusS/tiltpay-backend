@@ -29,6 +29,7 @@ router
   .group(() => {
     router.get('/balance', [WalletController, 'getBalance'])
     router.get('/address', [WalletController, 'getAddress'])
+    router.post('/transfer-by-tag', [WalletController, 'transferByTag'])
   })
   .prefix('wallet')
   .use(middleware.auth())

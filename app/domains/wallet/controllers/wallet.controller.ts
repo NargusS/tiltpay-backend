@@ -69,7 +69,7 @@ export default class WalletController {
     status: 201,
     description: 'Transfer money by tag',
   })
-  async transferByTag({ request, auth }: HttpContext) {
+  async transferByTag({ request, auth, response }: HttpContext) {
     const user = auth.user!
     const { amount, tag } = await request.validateUsing(TransferMoneyByTagValidator)
     const toUser = await this.user_service.get_by_tagname(tag)
@@ -77,5 +77,6 @@ export default class WalletController {
       throw new UserNotFoundException()
     }
     await this.wallet_service.transfer(user.id, toUser.id, amount)
+    return response.status(201).json({ message: 'Transfer money by tag' })
   }
 }
