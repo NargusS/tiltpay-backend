@@ -37,6 +37,14 @@ export class UserService {
     return user
   }
 
+  async get_by_tagname(tagname: string): Promise<User | null> {
+    const user = await User.findBy('tagname', tagname)
+    if (!user) {
+      return null
+    }
+    return user
+  }
+
   async update(id: number, fullName: string): Promise<User> {
     const user = await User.find(id)
     if (!user) {

@@ -28,6 +28,7 @@ router
 router
   .group(() => {
     router.get('/balance', [WalletController, 'getBalance'])
+    router.get('/address', [WalletController, 'getAddress'])
   })
   .prefix('wallet')
   .use(middleware.auth())

@@ -89,8 +89,8 @@ export class WalletService {
     return wallet.address
   }
 
-  async transfer(user_id: number, amount: number, to_address: string) {
-    throw new Error(`Not implemented: transfer from ${user_id} to ${to_address} amount ${amount}`)
+  async transfer(from: number, to: number, amount: number) {
+    throw new Error(`Not implemented: transfer from ${from} to ${to} amount ${amount}`)
   }
 
   async transfer_with_tag(user_id: number, amount: number, to_tag: string) {

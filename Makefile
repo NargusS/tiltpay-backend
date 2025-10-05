@@ -9,6 +9,19 @@ help:
 	@echo "  make db-shell  - Connect to PostgreSQL shell"
 	@echo "  make clean     - Stop services and remove volumes"
 
+new-domain:
+	@if [ -z "$1" ]; then echo "Usage: make new-domain <domain-name>"; exit 1; fi
+	mkdir -p app/domains/$1
+	mkdir -p app/domains/$1/models
+	mkdir -p app/domains/$1/services
+	mkdir -p app/domains/$1/controllers
+	mkdir -p app/domains/$1/validators
+	mkdir -p app/domains/$1/adapters
+	mkdir -p app/domains/$1/exceptions
+
+new-migration:
+
+
 up:
 	docker-compose up -d
 
