@@ -1,5 +1,5 @@
 import env from '#start/env'
-import { GridClient } from '@sqds/grid'
+import { BridgeCurrency, GridClient } from '@sqds/grid'
 import Wallet from '#domains/wallet/models/wallet.model'
 import { WalletNotFoundException } from '#domains/wallet/exceptions/wallet_not_found.exception'
 import { Keypair } from '@solana/web3.js'
@@ -10,6 +10,10 @@ import {
 } from '#domains/wallet/validators/grid.validators'
 import { GetWalletValidationException } from '#domains/wallet/exceptions/get_wallet_validation.exception'
 import { errors } from '@vinejs/vine'
+import {
+  SourceDepositInstructionsValidator,
+  SourceDepositInstructionsValidatorType,
+} from '../validators/get_virtual_account.validator.js'
 
 export interface TokenBalance {
   mint: string
@@ -95,5 +99,32 @@ export class WalletService {
 
   async transfer_with_tag(user_id: number, amount: number, to_tag: string) {
     throw new Error(`Not implemented: transfer from ${user_id} to ${to_tag} amount ${amount}`)
+  }
+
+  async get_virtual_account(
+    user_id: number,
+    currency: string
+  ): Promise<SourceDepositInstructionsValidatorType> {
+    const wallet = await Wallet.query()
+      .where('user_id', user_id)
+      .where('provider', 'solana')
+      .where('tag', 'primary')
+      .first()
+    if (!wallet) {
+      throw new WalletNotFoundException()
+    }
+    const response = await this.client.getVirtualAccounts(wallet.address, {
+      source_currency: currency as BridgeCurrency,
+      destination_currency: currency as BridgeCurrency,
+    })
+    if (!response.data) {
+      return []
+    }
+    const sourceDepositInstructions = response.data.map((virtualAccount) => {
+      return virtualAccount.source_deposit_instructions
+    })
+    const validatedSourceDepositInstructions =
+      SourceDepositInstructionsValidator.validate(sourceDepositInstructions)
+    return validatedSourceDepositInstructions
   }
 }

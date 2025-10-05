@@ -1,13 +1,23 @@
 import { HttpContext } from '@adonisjs/core/http'
 import { WalletService } from '#domains/wallet/services/wallet.service'
 import { inject } from '@adonisjs/core'
-import { ApiBody, ApiHeader, ApiOperation, ApiResponse } from '@foadonis/openapi/decorators'
+import {
+  ApiBody,
+  ApiHeader,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+} from '@foadonis/openapi/decorators'
 import { ErrorResponseSchema } from '#shared/error.schema'
 import { GetBalanceValidator } from '#domains/wallet/validators/grid.validators'
-import { TransferMoneyByTagValidator } from '../validators/transfer_money_by_tag.validator.js'
+import { TransferMoneyByTagValidator } from '#domains/wallet/validators/transfer_money_by_tag.validator'
 import { UserService } from '#domains/user/services/user.service'
 import { UserNotFoundException } from '#domains/user/exceptions/user_not_found.exception'
-import { UserSelfTransferException } from '../exceptions/user_self_transfer.exception.js'
+import { UserSelfTransferException } from '#domains/wallet/exceptions/user_self_transfer.exception'
+import {
+  GetVirtualAccountValidator,
+  SourceDepositInstructionsValidator,
+} from '#domains/wallet/validators/get_virtual_account.validator'
 
 @ApiHeader({
   name: 'Authorization',
@@ -90,5 +100,30 @@ export default class WalletController {
     }
     await this.wallet_service.transfer(user.id, toUser.id, amount)
     return response.status(201).json({ message: 'Transfer money by tag' })
+  }
+
+  // Get Virtual Account for deposit EUR | USD
+  @ApiOperation({
+    summary: 'Get Virtual Account for deposit EUR | USD',
+    description: 'Get Virtual Account for deposit EUR | USD',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Virtual Account',
+    type: () => SourceDepositInstructionsValidator,
+  })
+  @ApiQuery({
+    name: 'currency',
+    description: 'Currency',
+    required: true,
+    type: () => GetVirtualAccountValidator,
+  })
+  async getVirtualAccount({ request, response, auth }: HttpContext) {
+    const user = auth.user!
+    const { currency } = await request.validateUsing(GetVirtualAccountValidator)
+    const virtualAccounts = await this.wallet_service.get_virtual_account(user.id, currency)
+    return response.status(200).json({
+      virtual_accounts: virtualAccounts,
+    })
   }
 }
