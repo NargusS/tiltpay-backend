@@ -1,7 +1,7 @@
 import { inject } from '@adonisjs/core'
-import type { SmsAdapter } from '../adapters/sms_adapter.interface.js'
-import { MockSmsAdapter } from '../adapters/mock_sms_adapter.js'
-import { NotificationFailedException } from '../exceptions/notification_failed.exception.js'
+import type { SmsAdapter } from '#domains/notification/adapters/sms_adapter.interface'
+import { MockSmsAdapter } from '#domains/notification/adapters/mock_sms_adapter'
+import { NotificationFailedException } from '#domains/notification/exceptions/notification_failed.exception'
 import logger from '@adonisjs/core/services/logger'
 
 @inject()

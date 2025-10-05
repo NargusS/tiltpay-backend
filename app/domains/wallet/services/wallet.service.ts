@@ -4,7 +4,10 @@ import Wallet from '#domains/wallet/models/wallet.model'
 import { WalletNotFoundException } from '#domains/wallet/exceptions/wallet_not_found.exception'
 import { Keypair } from '@solana/web3.js'
 import { WrongAccountTypeException } from '#domains/wallet/exceptions/wrong_account_type.exception'
-import { GetBalanceValidator, GetBalanceValidatorType } from '../validators/grid.validators.js'
+import {
+  GetBalanceValidator,
+  GetBalanceValidatorType,
+} from '#domains/wallet/validators/grid.validators'
 import { GetWalletValidationException } from '#domains/wallet/exceptions/get_wallet_validation.exception'
 import { errors } from '@vinejs/vine'
 
