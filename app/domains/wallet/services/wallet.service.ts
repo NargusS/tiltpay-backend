@@ -77,6 +77,18 @@ export class WalletService {
     }
   }
 
+  async get_address(user_id: number): Promise<string> {
+    const wallet = await Wallet.query()
+      .where('user_id', user_id)
+      .where('provider', 'solana')
+      .where('tag', 'primary')
+      .first()
+    if (!wallet) {
+      throw new WalletNotFoundException()
+    }
+    return wallet.address
+  }
+
   async transfer(user_id: number, amount: number, to_address: string) {
     throw new Error(`Not implemented: transfer from ${user_id} to ${to_address} amount ${amount}`)
   }
