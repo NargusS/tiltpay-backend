@@ -8,7 +8,7 @@ import { TooManyAttemptsException } from '#domains/auth/exceptions/too_many_atte
 import { UserNotVerifiedException } from '#domains/user/exceptions/user_not_verified.exception'
 import { UserAlreadyExistsException } from '#domains/user/exceptions/user_already_exist.exception'
 import { VerifyAccountValidator } from '#domains/auth/validators/verify_account.validator'
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse } from '@foadonis/openapi/decorators'
+import { ApiBody, ApiHeader, ApiOperation, ApiResponse } from '@foadonis/openapi/decorators'
 import {
   CreateAccountResponseSchema,
   LoginResponseSchema,
@@ -168,7 +168,11 @@ export default class AuthController {
     }
   }
 
-  @ApiBearerAuth()
+  @ApiHeader({
+    name: 'Authorization',
+    description: 'Bearer token',
+    required: true,
+  })
   @ApiOperation({
     summary: 'Logout',
     description: 'Logout from account',

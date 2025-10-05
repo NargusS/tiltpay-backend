@@ -13,7 +13,8 @@ import { middleware } from './kernel.js'
 
 openapi.registerRoutes()
 
-const AuthController = () => import('#domains/auth/controllers/auth_controller')
+const AuthController = () => import('#domains/auth/controllers/auth.controller')
+const WalletController = () => import('#domains/wallet/controllers/wallet.controller')
 
 router
   .group(() => {
@@ -23,3 +24,10 @@ router
     router.post('/logout', [AuthController, 'logout']).use(middleware.auth())
   })
   .prefix('auth')
+
+router
+  .group(() => {
+    router.get('/balance', [WalletController, 'getBalance'])
+  })
+  .prefix('wallet')
+  .use(middleware.auth())

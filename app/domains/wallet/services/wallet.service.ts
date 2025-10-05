@@ -1,9 +1,12 @@
 import env from '#start/env'
 import { GridClient } from '@sqds/grid'
 import Wallet from '#domains/wallet/models/wallet.model'
-import { WalletNotFoundException } from '../exceptions/wallet_not_found.exception.js'
+import { WalletNotFoundException } from '#domains/wallet/exceptions/wallet_not_found.exception'
 import { Keypair } from '@solana/web3.js'
-import { WrongAccountTypeException } from '../exceptions/wrong_account_type.exception.js'
+import { WrongAccountTypeException } from '#domains/wallet/exceptions/wrong_account_type.exception'
+import { GetBalanceValidator, GetBalanceValidatorType } from '../validators/grid.validators.js'
+import { GetWalletValidationException } from '#domains/wallet/exceptions/get_wallet_validation.exception'
+import { errors } from '@vinejs/vine'
 
 export interface TokenBalance {
   mint: string
@@ -50,17 +53,25 @@ export class WalletService {
     return wallet
   }
 
-  async get_balance(user_id: number) {
-    const wallet = await Wallet.query()
-      .where('user_id', user_id)
-      .where('provider', 'solana')
-      .where('tag', 'primary')
-      .first()
-    if (!wallet) {
-      throw new WalletNotFoundException()
+  async get_balance(user_id: number): Promise<GetBalanceValidatorType> {
+    try {
+      const wallet = await Wallet.query()
+        .where('user_id', user_id)
+        .where('provider', 'solana')
+        .where('tag', 'primary')
+        .first()
+      if (!wallet) {
+        throw new WalletNotFoundException()
+      }
+      const response = await this.client.getAccountBalances(wallet.address)
+      const balance = GetBalanceValidator.validate(response.data)
+      return balance
+    } catch (error) {
+      if (error instanceof errors.E_VALIDATION_ERROR) {
+        throw new GetWalletValidationException()
+      }
+      throw error
     }
-    const balance = await this.client.getAccountBalances(wallet.address)
-    return balance as unknown as WalletBalance
   }
 
   async transfer(user_id: number, amount: number, to_address: string) {
