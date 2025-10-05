@@ -1,12 +1,13 @@
 import { HttpContext } from '@adonisjs/core/http'
 import { WalletService } from '#domains/wallet/services/wallet.service'
 import { inject } from '@adonisjs/core'
-import { ApiHeader, ApiOperation, ApiResponse } from '@foadonis/openapi/decorators'
+import { ApiBody, ApiHeader, ApiOperation, ApiResponse } from '@foadonis/openapi/decorators'
 import { ErrorResponseSchema } from '#shared/error.schema'
 import { GetBalanceValidator } from '#domains/wallet/validators/grid.validators'
 import { TransferMoneyByTagValidator } from '../validators/transfer_money_by_tag.validator.js'
 import { UserService } from '#domains/user/services/user.service'
 import { UserNotFoundException } from '#domains/user/exceptions/user_not_found.exception'
+import { UserSelfTransferException } from '../exceptions/user_self_transfer.exception.js'
 
 @ApiHeader({
   name: 'Authorization',
@@ -69,12 +70,23 @@ export default class WalletController {
     status: 201,
     description: 'Transfer money by tag',
   })
+  @ApiResponse({
+    status: 400,
+    description: 'User self transfer',
+    type: () => ErrorResponseSchema,
+  })
+  @ApiBody({
+    type: () => TransferMoneyByTagValidator,
+  })
   async transferByTag({ request, auth, response }: HttpContext) {
     const user = auth.user!
     const { amount, tag } = await request.validateUsing(TransferMoneyByTagValidator)
     const toUser = await this.user_service.get_by_tagname(tag)
     if (!toUser) {
       throw new UserNotFoundException()
+    }
+    if (user.id === toUser.id) {
+      throw new UserSelfTransferException()
     }
     await this.wallet_service.transfer(user.id, toUser.id, amount)
     return response.status(201).json({ message: 'Transfer money by tag' })
