@@ -1,5 +1,5 @@
 import env from '#start/env'
-import { BridgeCurrency, GridClient } from '@sqds/grid'
+import { GridClient } from '@sqds/grid'
 import Wallet from '#domains/wallet/models/wallet.model'
 import { WalletNotFoundException } from '#domains/wallet/exceptions/wallet_not_found.exception'
 import { Keypair } from '@solana/web3.js'
@@ -113,18 +113,13 @@ export class WalletService {
     if (!wallet) {
       throw new WalletNotFoundException()
     }
-    const response = await this.client.getVirtualAccounts(wallet.address, {
-      source_currency: currency as BridgeCurrency,
-      destination_currency: currency as BridgeCurrency,
-    })
+    const response = await this.client.getVirtualAccounts(wallet.address)
     if (!response.data) {
-      return []
+      return SourceDepositInstructionsValidator.validate({ data: [] })
     }
-    const sourceDepositInstructions = response.data.map((virtualAccount) => {
-      return virtualAccount.source_deposit_instructions
-    })
-    const validatedSourceDepositInstructions =
-      SourceDepositInstructionsValidator.validate(sourceDepositInstructions)
-    return validatedSourceDepositInstructions
+    const sourceDepositInstructions = response.data
+      .filter((virtualAccount) => virtualAccount.source_deposit_instructions.currency === currency)
+      .map((virtualAccount) => virtualAccount.source_deposit_instructions)
+    return SourceDepositInstructionsValidator.validate({ data: sourceDepositInstructions })
   }
 }
