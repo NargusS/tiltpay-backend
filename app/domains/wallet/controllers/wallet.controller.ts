@@ -63,6 +63,12 @@ export default class WalletController {
   @ApiResponse({
     status: 200,
     description: 'Wallet address',
+    schema: {
+      type: 'object',
+      properties: {
+        address: { type: 'string' },
+      },
+    },
   })
   async getAddress({ auth, response }: HttpContext) {
     const user = auth.user!
@@ -79,6 +85,12 @@ export default class WalletController {
   @ApiResponse({
     status: 201,
     description: 'Transfer money by tag',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+      },
+    },
   })
   @ApiResponse({
     status: 400,
