@@ -11,8 +11,8 @@ export const GetBalanceValidator = vine.compile(
         token_address: vine.string(),
         amount: vine.number(),
         decimals: vine.number(),
-        symbol: vine.string(),
-        name: vine.string(),
+        symbol: vine.string().nullable(),
+        name: vine.string().nullable(),
         logo_url: vine.string().nullable(),
       })
     ),

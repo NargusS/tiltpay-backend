@@ -9,7 +9,6 @@ import {
   WalletNotFoundException,
   WrongAccountTypeException,
 } from '#domains/wallet/exceptions/wallet.exception'
-import { Keypair } from '@solana/web3.js'
 import { RequestKycLinkResponse } from '#domains/wallet/types/wallet.response.types'
 import { BridgeCurrency, GridClient, VirtualAccount } from '@sqds/grid'
 import {
@@ -17,6 +16,8 @@ import {
   KycType,
   SourceDepositInstructions,
 } from '#domains/wallet/types/wallet.types'
+import { MAP_CONTRACT_ADDRESS } from '#domains/wallet/constants/wallet.constants'
+import { Keypair } from '@solana/web3.js'
 
 export interface TokenBalance {
   mint: string
@@ -73,8 +74,24 @@ export class WalletService {
       throw new WalletNotFoundException()
     }
     const response = await this.client.getAccountBalances(wallet.address)
-    const balance = GetBalanceValidator.validate(response.data)
-    return balance
+    console.dir(response, { depth: null })
+    const balance = await GetBalanceValidator.validate(response.data)
+    return {
+      ...balance,
+      tokens: balance.tokens.map((token) => {
+        const tokenInfo =
+          MAP_CONTRACT_ADDRESS[token.token_address as keyof typeof MAP_CONTRACT_ADDRESS]
+        if (tokenInfo) {
+          return {
+            ...token,
+            symbol: tokenInfo.symbol,
+            name: tokenInfo.name,
+            logo_url: tokenInfo.logo_url,
+          }
+        }
+        return token
+      }),
+    }
   }
 
   async get_address(user_id: number): Promise<string> {
@@ -87,6 +104,10 @@ export class WalletService {
       throw new WalletNotFoundException()
     }
     return wallet.address
+  }
+
+  private parsePrivateKey(privateKeyString: string): Uint8Array {
+    return Uint8Array.from(privateKeyString.split(',').map(Number))
   }
 
   async transfer(from: number, to: number, amount: number) {
@@ -119,23 +140,16 @@ export class WalletService {
         payment_rail: 'solana',
       },
     })
-
     if (!response.data) {
       throw new WalletException('Transaction payload not found')
     }
-    const taggedKeyPair = {
-      publicKey: fromWallet.publicKey,
-      privateKey: fromWallet.privateKey,
-      provider: 'solana' as const,
-      tag: 'primary' as const,
-    }
-    const signedTransaction = await this.client.signAndSend({
-      sessionSecrets: [taggedKeyPair],
+    const keypair = Keypair.fromSecretKey(this.parsePrivateKey(fromWallet.privateKey))
+    await this.client.signAndSend({
+      sessionSecrets: [keypair as any], // ! LIBRARY NEED TO BE FIXED
       transactionPayload: response.data.transactionPayload!,
       address: toWallet.address,
     })
-    console.log(signedTransaction)
-    return response
+    return
   }
 
   async request_kyc_link(

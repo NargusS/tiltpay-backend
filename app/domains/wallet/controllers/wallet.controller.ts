@@ -186,7 +186,7 @@ export default class WalletController {
           name: 'Wallet not found',
         })
       }
-      logger.error(`Internal server error`, { error: error.message })
+      logger.error(`Internal server error ${error.message}`)
       return response.status(error.status).json(error)
     }
   }
