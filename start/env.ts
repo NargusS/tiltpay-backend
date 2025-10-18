@@ -30,4 +30,5 @@ export default await Env.create(new URL('../', import.meta.url), {
   DB_DATABASE: Env.schema.string(),
   GRID_API_KEY: Env.schema.string(),
   GRID_ENVIRONMENT: Env.schema.string(),
+  APP_URL: Env.schema.string(),
 })

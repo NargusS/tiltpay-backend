@@ -1,4 +1,5 @@
 import { defineConfig } from '@foadonis/openapi'
+import env from '#start/env'
 
 export default defineConfig({
   ui: 'scalar',
@@ -10,7 +11,7 @@ export default defineConfig({
     },
     servers: [
       {
-        url: 'http://localhost:3333',
+        url: env.get('APP_URL'),
         description: 'Development server',
       },
     ],
