@@ -44,7 +44,7 @@ export default class AuthService {
     if (user) {
       throw new UserAlreadyExistsException()
     }
-    const verificationCode = Math.floor(100000 + Math.random() * 900000) // 6 digits 000000 - 999999
+    const verificationCode = 111111
     const newUser = await this.user_service.create(
       fullName,
       tagName,
