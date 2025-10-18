@@ -1,5 +1,6 @@
 import User from '#domains/user/models/user'
 import { UserNotFoundException } from '#domains/user/exceptions/user_not_found.exception'
+import { DateTime } from 'luxon'
 
 export class UserService {
   constructor() {}
@@ -71,6 +72,18 @@ export class UserService {
       throw new UserNotFoundException('User not found')
     }
     user.attempt = attempt
+    user.lastAttemptAt = DateTime.now()
+    await user.save()
+    return user
+  }
+
+  async reset_attempt(id: number): Promise<User> {
+    const user = await User.find(id)
+    if (!user) {
+      throw new UserNotFoundException('User not found')
+    }
+    user.attempt = 0
+    user.lastAttemptAt = null
     await user.save()
     return user
   }

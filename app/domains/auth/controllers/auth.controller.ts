@@ -84,10 +84,11 @@ export default class AuthController {
         })
       }
       if (error instanceof TooManyAttemptsException) {
-        return response.status(429).json({
-          message: 'Too many attempts',
+        return response.status(429).header('Retry-After', error.retryAfter.toString()).json({
+          message: 'Too many attempts. Please try again later.',
           code: 'TOO_MANY_ATTEMPTS',
           name: 'Too many attempts',
+          retry_after: error.retryAfter,
         })
       }
       if (error instanceof InvalidCredentialsException) {

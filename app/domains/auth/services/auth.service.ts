@@ -10,14 +10,62 @@ import { UnabledToVerifyException } from '#domains/auth/exceptions/unabled_to_ve
 import hash from '@adonisjs/core/services/hash'
 import NotificationService from '#domains/notification/services/notification.service'
 import { WalletService } from '#domains/wallet/services/wallet.service'
+import { DateTime } from 'luxon'
 
 @inject()
 export default class AuthService {
+  // Cooldown duration in minutes based on attempt count
+  private readonly COOLDOWN_PERIODS = [1, 5, 15]
+
   constructor(
     private user_service: UserService,
     private wallet_service: WalletService,
     private notification_service: NotificationService
   ) {}
+
+  /**
+   * Calculate cooldown period based on attempt count
+   * After 3 failed attempts: 1 minute
+   * After 6 failed attempts: 5 minutes
+   * After 9+ failed attempts: 15 minutes
+   */
+  private getCooldownMinutes(attempt: number): number {
+    if (attempt < 3) return 0 // No cooldown yet
+    if (attempt < 6) return this.COOLDOWN_PERIODS[0] // 1 minute
+    if (attempt < 9) return this.COOLDOWN_PERIODS[1] // 5 minutes
+    return this.COOLDOWN_PERIODS[2] // 15 minutes
+  }
+
+  /**
+   * Check if user is in cooldown period and return remaining seconds
+   * Returns 0 if no cooldown is active
+   */
+  private getRemainingCooldown(user: User): number {
+    // No cooldown if less than 3 attempts or no last attempt recorded
+    if (!user.lastAttemptAt || user.attempt < 3) {
+      return 0
+    }
+
+    const now = DateTime.now()
+    const lastAttempt = user.lastAttemptAt
+    if (!lastAttempt) {
+      return 0
+    }
+    const cooldownMinutes = this.getCooldownMinutes(user.attempt)
+
+    // No cooldown period if attempt count doesn't warrant it
+    if (cooldownMinutes === 0) {
+      return 0
+    }
+
+    const cooldownEnd = lastAttempt.plus({ minutes: cooldownMinutes })
+
+    if (now < cooldownEnd) {
+      return Math.ceil(cooldownEnd.diff(now, 'seconds').seconds)
+    }
+
+    return 0
+  }
 
   async login(phoneNumber: string, code: string): Promise<User> {
     const user = await this.user_service.get_by_phone_number(phoneNumber)
@@ -27,15 +75,21 @@ export default class AuthService {
     if (!user.verified) {
       throw new UserNotVerifiedException()
     }
-    if (user.attempt >= 3) {
-      throw new TooManyAttemptsException()
+
+    // Check if user is in cooldown period
+    const remainingCooldown = this.getRemainingCooldown(user)
+    if (remainingCooldown > 0) {
+      throw new TooManyAttemptsException(remainingCooldown)
     }
+
     const verified = await hash.verify(user.code, code)
     if (!verified) {
       await this.user_service.update_attempt(user.id, user.attempt + 1)
       throw new MissmatchCodeException()
     }
-    await this.user_service.update_attempt(user.id, 0)
+
+    // Reset attempts only on successful login
+    await this.user_service.reset_attempt(user.id)
     return user
   }
 

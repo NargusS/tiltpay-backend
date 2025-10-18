@@ -37,6 +37,9 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare attempt: number
 
+  @column.dateTime()
+  declare lastAttemptAt: DateTime | null
+
   @hasMany(() => Wallet, {
     foreignKey: 'userId',
   })
