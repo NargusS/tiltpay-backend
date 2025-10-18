@@ -30,6 +30,7 @@ router
     router.get('/balance', [WalletController, 'getBalance'])
     router.get('/address', [WalletController, 'getAddress'])
     router.post('/transfer-by-tag', [WalletController, 'transferByTag'])
+    router.post('/transfer-by-address', [WalletController, 'transferByAddress'])
     router.post('/virtual-account', [WalletController, 'requestVirtualAccount'])
     router.get('/virtual-account', [WalletController, 'getVirtualAccount'])
     router.post('/kyc', [WalletController, 'requestKycLink'])

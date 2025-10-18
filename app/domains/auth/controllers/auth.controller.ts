@@ -18,6 +18,7 @@ import {
 import { InvalidCredentialsException } from '#domains/user/exceptions/invalid_credentials.exception'
 import { UnabledToVerifyException } from '#domains/auth/exceptions/unabled_to_verify.exception'
 import { ErrorResponse } from '#shared/error.types'
+import { MissmatchCodeException } from '../exceptions/missmatch_code.exception.js'
 
 @ApiResponse({
   status: 500,
@@ -69,18 +70,45 @@ export default class AuthController {
       return response.status(200).json({ access_token: token })
     } catch (error) {
       if (error instanceof UserNotVerifiedException) {
-        return response.status(error.status).json(error)
+        return response.status(412).json({
+          message: 'User not verified',
+          code: 'USER_NOT_VERIFIED',
+          name: 'User not verified',
+        })
       }
       if (error instanceof UserNotFoundException) {
-        return response.status(error.status).json(error)
+        return response.status(404).json({
+          message: 'User not found',
+          code: 'USER_NOT_FOUND',
+          name: 'User not found',
+        })
       }
       if (error instanceof TooManyAttemptsException) {
-        return response.status(error.status).json(error)
+        return response.status(429).json({
+          message: 'Too many attempts',
+          code: 'TOO_MANY_ATTEMPTS',
+          name: 'Too many attempts',
+        })
       }
       if (error instanceof InvalidCredentialsException) {
-        return response.status(error.status).json(error)
+        return response.status(401).json({
+          message: 'Invalid credentials',
+          code: 'INVALID_CREDENTIALS',
+          name: 'Invalid credentials',
+        })
       }
-      return response.status(error.status).json(error)
+      if (error instanceof MissmatchCodeException) {
+        return response.status(412).json({
+          message: 'Code does not match',
+          code: 'CODE_DOES_NOT_MATCH',
+          name: 'Code does not match',
+        })
+      }
+      return response.status(500).json({
+        message: 'Internal server error',
+        code: 'INTERNAL_SERVER_ERROR',
+        name: 'Internal server error',
+      })
     }
   }
 

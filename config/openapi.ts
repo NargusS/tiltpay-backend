@@ -9,6 +9,16 @@ export default defineConfig({
       version: '1.0.0',
       description: 'TiltPay payment platform API',
     },
+    tags: [
+      {
+        name: 'Auth',
+        description: 'Authentication endpoints',
+      },
+      {
+        name: 'Wallet',
+        description: 'Wallet endpoints',
+      },
+    ],
     servers: [
       {
         url: env.get('APP_URL'),

@@ -24,7 +24,7 @@ export class TransferMoneyByTagResponse {
   declare message: string
 }
 
-export class RequestVirtualAccountResponse {
+export class CreateVirtualAccountResponse {
   @ApiProperty({
     description: 'The virtual account',
     example: 'virtual_account',

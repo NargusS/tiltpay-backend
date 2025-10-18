@@ -10,26 +10,27 @@ import {
   ApiResponse,
 } from '@foadonis/openapi/decorators'
 import { GetBalanceValidator } from '#domains/wallet/validators/grid.validators'
-import { TransferMoneyByTagValidator } from '#domains/wallet/validators/transfer_money_by_tag.validator'
 import { UserService } from '#domains/user/services/user.service'
 import { UserNotFoundException } from '#domains/user/exceptions/user_not_found.exception'
-import {
-  GetVirtualAccountValidator,
-  RequestVirtualAccountValidator,
-} from '#domains/wallet/validators/get_virtual_account.validator'
 import {
   UserSelfTransferException,
   WalletNotFoundException,
 } from '#domains/wallet/exceptions/wallet.exception'
 import {
+  CreateVirtualAccountResponse,
   GetKycStatusResponse,
   GetVirtualAccountsResponse,
   GetWalletAddressResponse,
   RequestKycLinkResponse,
-  RequestVirtualAccountResponse,
   TransferMoneyByTagResponse,
 } from '#domains/wallet/types/wallet.response.types'
 import { ErrorResponse } from '#shared/error.types'
+import {
+  CreateVirtualAccountRequest,
+  GetVirtualAccountRequest,
+  TransferMoneyByAddressRequest,
+  TransferMoneyByTagRequest,
+} from '#domains/wallet/validators/request.validator'
 
 @ApiHeader({
   name: 'Authorization',
@@ -142,24 +143,24 @@ export default class WalletController {
     type: ErrorResponse,
   })
   @ApiBody({
-    type: () => TransferMoneyByTagValidator,
+    type: () => TransferMoneyByTagRequest,
   })
   async transferByTag({ request, logger, auth, response }: HttpContext) {
     try {
-      const user = auth.user!
-      const { amount, tag } = await request.validateUsing(TransferMoneyByTagValidator)
+      const userId = auth.user!.id
+      const { amount, tag } = await request.validateUsing(TransferMoneyByTagRequest)
       logger.info(
-        `Transferring money by tag for user ${user.id} to user ${tag} with amount ${amount}`
+        `Transferring money by tag for user ${userId} to user ${tag} with amount ${amount}`
       )
       const toUser = await this.user_service.get_by_tagname(tag)
       if (!toUser) {
         throw new UserNotFoundException()
       }
-      if (user.id === toUser.id) {
+      if (userId === toUser.id) {
         throw new UserSelfTransferException()
       }
-      await this.wallet_service.transfer(user.id, toUser.id, amount)
-      logger.info(`Money transferred successfully for user ${user.id} to user ${toUser.id}`)
+      await this.wallet_service.transfer_to_user(userId, toUser.id, amount)
+      logger.info(`Money transferred successfully for user ${userId} to user ${toUser.id}`)
       return response.status(201).json({ message: 'Transfer money by tag' })
     } catch (error) {
       if (error instanceof UserNotFoundException) {
@@ -192,13 +193,74 @@ export default class WalletController {
   }
 
   @ApiOperation({
+    summary: 'Transfer money by address',
+    description: 'Transfer money by address',
+  })
+  @ApiBody({
+    type: () => TransferMoneyByAddressRequest,
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Transfer money by address',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'User self transfer',
+    type: ErrorResponse,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Wallet not found | User not found',
+    type: ErrorResponse,
+  })
+  async transferByAddress({ request, logger, auth, response }: HttpContext) {
+    try {
+      const userId = auth.user!.id
+      const { amount, address } = await request.validateUsing(TransferMoneyByAddressRequest)
+      logger.info(
+        `Transferring money by address for user ${userId} to address ${address} with amount ${amount}`
+      )
+      const userAddress = await this.wallet_service.get_address(userId)
+      if (userAddress === address) {
+        throw new UserSelfTransferException()
+      }
+      await this.wallet_service.transfer_to_address(userId, address, amount)
+      logger.info(`Money transferred successfully for user ${userId} to address ${address}`)
+      return response.status(201).json({ message: 'Transfer money by address' })
+    } catch (error) {
+      if (error instanceof UserSelfTransferException) {
+        logger.error(`User self transfer`, { error: error.message })
+        return response.status(400).json({
+          message: 'User self transfer',
+          code: 'USER_SELF_TRANSFER',
+          name: 'User self transfer',
+        })
+      }
+      if (error instanceof WalletNotFoundException) {
+        logger.error(`Wallet not found`, { error: error.message })
+        return response.status(404).json({
+          message: 'Wallet not found',
+          code: 'WALLET_NOT_FOUND',
+          name: 'Wallet not found',
+        })
+      }
+      logger.error(`Internal server error ${error.message}`)
+      return response.status(500).json({
+        message: 'Internal server error',
+        code: 'INTERNAL_SERVER_ERROR',
+        name: 'Internal server error',
+      })
+    }
+  }
+
+  @ApiOperation({
     summary: 'Request Virtual Account',
     description: 'Request Virtual Account',
   })
   @ApiResponse({
     status: 200,
     description: 'Virtual Account',
-    type: RequestVirtualAccountResponse,
+    type: CreateVirtualAccountResponse,
   })
   @ApiQuery({
     name: 'currency',
@@ -208,7 +270,7 @@ export default class WalletController {
   async requestVirtualAccount({ request, logger, response, auth }: HttpContext) {
     try {
       const user = auth.user!
-      const { currency } = await request.validateUsing(RequestVirtualAccountValidator)
+      const { currency } = await request.validateUsing(CreateVirtualAccountRequest)
       logger.info(`Requesting virtual account for user ${user.id} with currency ${currency}`)
       const virtualAccount = await this.wallet_service.request_virtual_account(user.id, currency)
       logger.info(`Virtual account requested successfully`, { virtualAccount: virtualAccount })
@@ -250,7 +312,7 @@ export default class WalletController {
   async getVirtualAccount({ request, logger, response, auth }: HttpContext) {
     try {
       const user = auth.user!
-      const { currency } = await request.validateUsing(GetVirtualAccountValidator)
+      const { currency } = await request.validateUsing(GetVirtualAccountRequest)
       logger.info(`Getting virtual accounts for user ${user.id} with currency ${currency}`)
       const virtualAccounts = await this.wallet_service.get_virtual_account(user.id, currency)
       logger.info(`Virtual accounts fetched successfully`, { virtualAccounts: virtualAccounts })

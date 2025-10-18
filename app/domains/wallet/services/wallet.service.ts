@@ -110,7 +110,7 @@ export class WalletService {
     return Uint8Array.from(privateKeyString.split(',').map(Number))
   }
 
-  async transfer(from: number, to: number, amount: number) {
+  async transfer_to_user(from: number, to: number, amount: number) {
     const fromWallet = await Wallet.query()
       .where('user_id', from)
       .where('provider', 'solana')
@@ -148,6 +148,40 @@ export class WalletService {
       sessionSecrets: [keypair as any], // ! LIBRARY NEED TO BE FIXED
       transactionPayload: response.data.transactionPayload!,
       address: toWallet.address,
+    })
+    return
+  }
+
+  async transfer_to_address(from: number, to_address: string, amount: number) {
+    const fromWallet = await Wallet.query()
+      .where('user_id', from)
+      .where('provider', 'solana')
+      .where('tag', 'primary')
+      .first()
+    if (!fromWallet) {
+      throw new WalletNotFoundException()
+    }
+    const response = await this.client.createPaymentIntent(fromWallet.address, {
+      amount: (amount * 1000000).toString(),
+      grid_user_id: fromWallet.gridUserId,
+      source: {
+        account: fromWallet.address,
+        currency: 'usdc',
+      },
+      destination: {
+        address: to_address,
+        currency: 'usdc',
+        payment_rail: 'solana',
+      },
+    })
+    if (!response.data) {
+      throw new WalletException('Transaction payload not found')
+    }
+    const keypair = Keypair.fromSecretKey(this.parsePrivateKey(fromWallet.privateKey))
+    await this.client.signAndSend({
+      sessionSecrets: [keypair as any], // ! LIBRARY NEED TO BE FIXED
+      transactionPayload: response.data.transactionPayload!,
+      address: to_address,
     })
     return
   }
