@@ -15,6 +15,8 @@ openapi.registerRoutes()
 
 const AuthController = () => import('#domains/auth/controllers/auth.controller')
 const WalletController = () => import('#domains/wallet/controllers/wallet.controller')
+const TransactionController = () =>
+  import('#domains/transaction/controllers/transaction.controller')
 
 router
   .group(() => {
@@ -37,4 +39,11 @@ router
     router.get('/kyc/:kyc_id', [WalletController, 'getKycStatus'])
   })
   .prefix('wallet')
+  .use(middleware.auth())
+
+router
+  .group(() => {
+    router.get('/', [TransactionController, 'index'])
+  })
+  .prefix('transactions')
   .use(middleware.auth())
