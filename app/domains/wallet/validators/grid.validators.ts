@@ -8,11 +8,12 @@ export const GetBalanceValidator = vine.compile(
     sol: vine.number(),
     tokens: vine.array(
       vine.object({
-        mint: vine.string(),
+        token_address: vine.string(),
         amount: vine.number(),
         decimals: vine.number(),
         symbol: vine.string(),
         name: vine.string(),
+        logo_url: vine.string().nullable(),
       })
     ),
   })

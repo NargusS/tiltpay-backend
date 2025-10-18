@@ -15,19 +15,14 @@ import {
   LogoutResponseSchema,
   VerifyAccountResponseSchema,
 } from '#domains/auth/validators/response'
-import { ErrorResponseSchema, ValidationErrorResponseSchema } from '#shared/error.schema'
 import { InvalidCredentialsException } from '#domains/user/exceptions/invalid_credentials.exception'
 import { UnabledToVerifyException } from '#domains/auth/exceptions/unabled_to_verify.exception'
+import { ErrorResponse } from '#shared/error.types'
 
 @ApiResponse({
   status: 500,
   description: 'Internal server error',
-  type: () => ErrorResponseSchema,
-})
-@ApiResponse({
-  status: 422,
-  description: 'Validation error',
-  type: () => ValidationErrorResponseSchema,
+  type: ErrorResponse,
 })
 @inject()
 export default class AuthController {
@@ -48,22 +43,22 @@ export default class AuthController {
   @ApiResponse({
     status: 412,
     description: 'User not verified',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   @ApiResponse({
     status: 429,
     description: 'Too many attempts',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   @ApiResponse({
     status: 401,
     description: 'Invalid credentials',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   @ApiResponse({
     status: 404,
     description: 'User not found',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   async login({ auth, request, response }: HttpContext) {
     try {
@@ -104,17 +99,17 @@ export default class AuthController {
   @ApiResponse({
     status: 409,
     description: 'User already exists',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   @ApiResponse({
     status: 412,
     description: 'Code does not match',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   @ApiResponse({
     status: 422,
     description: 'Validation error',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   async createAccount({ request, response }: HttpContext) {
     try {
@@ -145,12 +140,12 @@ export default class AuthController {
   @ApiResponse({
     status: 404,
     description: 'User not found',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   @ApiResponse({
     status: 401,
     description: 'Unabled to verify',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   async verifyAccount({ request, response }: HttpContext) {
     try {
@@ -185,7 +180,7 @@ export default class AuthController {
   @ApiResponse({
     status: 401,
     description: 'Unauthorized',
-    type: () => ErrorResponseSchema,
+    type: ErrorResponse,
   })
   async logout({ auth, response }: HttpContext) {
     try {

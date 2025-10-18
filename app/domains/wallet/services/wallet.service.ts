@@ -1,19 +1,22 @@
 import env from '#start/env'
-import { GridClient } from '@sqds/grid'
 import Wallet from '#domains/wallet/models/wallet.model'
-import { WalletNotFoundException } from '#domains/wallet/exceptions/wallet_not_found.exception'
-import { Keypair } from '@solana/web3.js'
-import { WrongAccountTypeException } from '#domains/wallet/exceptions/wrong_account_type.exception'
 import {
   GetBalanceValidator,
   GetBalanceValidatorType,
 } from '#domains/wallet/validators/grid.validators'
-import { GetWalletValidationException } from '#domains/wallet/exceptions/get_wallet_validation.exception'
-import { errors } from '@vinejs/vine'
 import {
-  SourceDepositInstructionsValidator,
-  SourceDepositInstructionsValidatorType,
-} from '../validators/get_virtual_account.validator.js'
+  WalletException,
+  WalletNotFoundException,
+  WrongAccountTypeException,
+} from '#domains/wallet/exceptions/wallet.exception'
+import { Keypair } from '@solana/web3.js'
+import { RequestKycLinkResponse } from '#domains/wallet/types/wallet.response.types'
+import { BridgeCurrency, GridClient, VirtualAccount } from '@sqds/grid'
+import {
+  KycStatusData,
+  KycType,
+  SourceDepositInstructions,
+} from '#domains/wallet/types/wallet.types'
 
 export interface TokenBalance {
   mint: string
@@ -61,24 +64,17 @@ export class WalletService {
   }
 
   async get_balance(user_id: number): Promise<GetBalanceValidatorType> {
-    try {
-      const wallet = await Wallet.query()
-        .where('user_id', user_id)
-        .where('provider', 'solana')
-        .where('tag', 'primary')
-        .first()
-      if (!wallet) {
-        throw new WalletNotFoundException()
-      }
-      const response = await this.client.getAccountBalances(wallet.address)
-      const balance = GetBalanceValidator.validate(response.data)
-      return balance
-    } catch (error) {
-      if (error instanceof errors.E_VALIDATION_ERROR) {
-        throw new GetWalletValidationException()
-      }
-      throw error
+    const wallet = await Wallet.query()
+      .where('user_id', user_id)
+      .where('provider', 'solana')
+      .where('tag', 'primary')
+      .first()
+    if (!wallet) {
+      throw new WalletNotFoundException()
     }
+    const response = await this.client.getAccountBalances(wallet.address)
+    const balance = GetBalanceValidator.validate(response.data)
+    return balance
   }
 
   async get_address(user_id: number): Promise<string> {
@@ -94,17 +90,59 @@ export class WalletService {
   }
 
   async transfer(from: number, to: number, amount: number) {
-    throw new Error(`Not implemented: transfer from ${from} to ${to} amount ${amount}`)
+    const fromWallet = await Wallet.query()
+      .where('user_id', from)
+      .where('provider', 'solana')
+      .where('tag', 'primary')
+      .first()
+    if (!fromWallet) {
+      throw new WalletNotFoundException()
+    }
+    const toWallet = await Wallet.query()
+      .where('user_id', to)
+      .where('provider', 'solana')
+      .where('tag', 'primary')
+      .first()
+    if (!toWallet) {
+      throw new WalletNotFoundException()
+    }
+    const response = await this.client.createPaymentIntent(fromWallet.address, {
+      amount: (amount * 1000000).toString(),
+      grid_user_id: fromWallet.gridUserId,
+      source: {
+        account: fromWallet.address,
+        currency: 'usdc',
+      },
+      destination: {
+        address: toWallet.address,
+        currency: 'usdc',
+        payment_rail: 'solana',
+      },
+    })
+
+    if (!response.data) {
+      throw new WalletException('Transaction payload not found')
+    }
+    const taggedKeyPair = {
+      publicKey: fromWallet.publicKey,
+      privateKey: fromWallet.privateKey,
+      provider: 'solana' as const,
+      tag: 'primary' as const,
+    }
+    const signedTransaction = await this.client.signAndSend({
+      sessionSecrets: [taggedKeyPair],
+      transactionPayload: response.data.transactionPayload!,
+      address: toWallet.address,
+    })
+    console.log(signedTransaction)
+    return response
   }
 
-  async transfer_with_tag(user_id: number, amount: number, to_tag: string) {
-    throw new Error(`Not implemented: transfer from ${user_id} to ${to_tag} amount ${amount}`)
-  }
-
-  async get_virtual_account(
+  async request_kyc_link(
     user_id: number,
-    currency: string
-  ): Promise<SourceDepositInstructionsValidatorType> {
+    email: string,
+    full_name: string
+  ): Promise<RequestKycLinkResponse> {
     const wallet = await Wallet.query()
       .where('user_id', user_id)
       .where('provider', 'solana')
@@ -113,13 +151,88 @@ export class WalletService {
     if (!wallet) {
       throw new WalletNotFoundException()
     }
-    const response = await this.client.getVirtualAccounts(wallet.address)
-    if (!response.data) {
-      return SourceDepositInstructionsValidator.validate({ data: [] })
+    const response = await this.client.requestKycLink(wallet.address, {
+      grid_user_id: wallet.gridUserId,
+      type: KycType.INDIVIDUAL,
+      email: email,
+      full_name: full_name,
+      endorsements: ['sepa'],
+    })
+    return {
+      id: response.data?.id,
+      full_name: response.data?.full_name,
+      email: response.data?.email,
+      type: response.data?.type,
+      kyc_link: response.data?.kyc_link,
+      tos_link: response.data?.tos_link,
+      kyc_status: response.data?.kyc_status,
+      rejection_reasons: response.data?.rejection_reasons,
+      tos_status: response.data?.tos_status,
+      created_at: response.data?.created_at,
+      customer_id: response.data?.customer_id,
+      persona_inquiry_type: response.data?.persona_inquiry_type,
     }
-    const sourceDepositInstructions = response.data
-      .filter((virtualAccount) => virtualAccount.source_deposit_instructions.currency === currency)
-      .map((virtualAccount) => virtualAccount.source_deposit_instructions)
-    return SourceDepositInstructionsValidator.validate({ data: sourceDepositInstructions })
+  }
+
+  async get_kyc_status(user_id: number, kyc_id: string): Promise<KycStatusData> {
+    const wallet = await Wallet.query()
+      .where('user_id', user_id)
+      .where('provider', 'solana')
+      .where('tag', 'primary')
+      .first()
+    if (!wallet) {
+      throw new WalletNotFoundException()
+    }
+    const response = await this.client.getKycStatus(wallet.address, kyc_id)
+    return {
+      id: response.data?.id,
+      account: response.data?.account,
+      type: response.data?.type,
+      status: response.data?.status,
+      tos_status: response.data?.tos_status,
+      kyc_continuation_link: response.data?.kyc_continuation_link,
+      rejection_reasons: response.data?.rejection_reasons,
+      requirements_due: response.data?.requirements_due,
+      created_at: response.data?.created_at,
+      updated_at: response.data?.updated_at,
+    }
+  }
+
+  async request_virtual_account(user_id: number, currency: string): Promise<VirtualAccount> {
+    const wallet = await Wallet.query()
+      .where('user_id', user_id)
+      .where('provider', 'solana')
+      .where('tag', 'primary')
+      .first()
+    if (!wallet) {
+      throw new WalletNotFoundException()
+    }
+    const response = await this.client.requestVirtualAccount(wallet.address, {
+      currency: currency as BridgeCurrency,
+      grid_user_id: wallet.gridUserId,
+    })
+    return response.data as VirtualAccount
+  }
+
+  async get_virtual_account(
+    user_id: number,
+    currency: string
+  ): Promise<SourceDepositInstructions[]> {
+    const wallet = await Wallet.query()
+      .where('user_id', user_id)
+      .where('provider', 'solana')
+      .where('tag', 'primary')
+      .first()
+    if (!wallet) {
+      throw new WalletNotFoundException()
+    }
+    const response = (await this.client.getVirtualAccounts(wallet.address)) as VirtualAccount[]
+    const sourceDepositInstructions = response
+      .filter(
+        (virtualAccount: VirtualAccount) =>
+          virtualAccount.source_deposit_instructions.currency === currency
+      )
+      .map((depositInstructions: VirtualAccount) => depositInstructions.source_deposit_instructions)
+    return sourceDepositInstructions
   }
 }
