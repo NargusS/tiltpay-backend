@@ -64,6 +64,14 @@ export class WalletService {
     return wallet
   }
 
+  async get_by_address(address: string): Promise<Wallet | null> {
+    const wallet = await Wallet.query().where('address', address).first()
+    if (!wallet) {
+      return null
+    }
+    return wallet
+  }
+
   async get_balance(user_id: number): Promise<GetBalanceValidatorType> {
     const wallet = await Wallet.query()
       .where('user_id', user_id)
@@ -282,5 +290,9 @@ export class WalletService {
       )
       .map((depositInstructions: VirtualAccount) => depositInstructions.source_deposit_instructions)
     return sourceDepositInstructions
+  }
+
+  async get_all(): Promise<Wallet[]> {
+    return await Wallet.all()
   }
 }

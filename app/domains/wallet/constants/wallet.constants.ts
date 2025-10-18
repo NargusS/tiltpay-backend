@@ -5,3 +5,5 @@ export const MAP_CONTRACT_ADDRESS = {
     logo_url: 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png?1547042194',
   },
 }
+
+export const USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'

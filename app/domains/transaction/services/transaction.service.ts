@@ -10,18 +10,23 @@ import {
   TransactionNotFoundException,
   InvalidTransactionException,
 } from '#domains/transaction/exceptions/transaction.exceptions'
-import { GridClient } from '@sqds/grid'
+import { GridClient, SplTransfer } from '@sqds/grid'
 import env from '#start/env'
+import { WalletService } from '#domains/wallet/services/wallet.service'
+import { USDC_MINT } from '#domains/wallet/constants/wallet.constants'
 
 @inject()
 export default class TransactionService {
   client: GridClient
-  constructor() {
+  walletService: WalletService
+  constructor(walletService: WalletService) {
+    this.walletService = walletService
     this.client = new GridClient({
       baseUrl: 'https://grid.squads.xyz',
       apiKey: env.get('GRID_API_KEY'),
       environment: 'sandbox',
     })
+    this.walletService = walletService
   }
   /**
    * Create a deposit transaction
@@ -31,12 +36,14 @@ export default class TransactionService {
     amount: number,
     currency: string,
     description?: string,
+    status?: TransactionStatus,
+    completedAt?: DateTime,
     txHash?: string,
     network?: Network
   ): Promise<Transaction> {
     const transaction = await Transaction.create({
       type: TransactionType.DEPOSIT,
-      status: TransactionStatus.PENDING,
+      status: status || TransactionStatus.PENDING,
       fromWalletId: null,
       toWalletId,
       amount,
@@ -44,6 +51,7 @@ export default class TransactionService {
       description,
       txHash,
       network,
+      completedAt,
     })
 
     return transaction
@@ -57,12 +65,14 @@ export default class TransactionService {
     amount: number,
     currency: string,
     description?: string,
+    status?: TransactionStatus,
+    completedAt?: DateTime,
     txHash?: string,
     network?: Network
   ): Promise<Transaction> {
     const transaction = await Transaction.create({
       type: TransactionType.WITHDRAW,
-      status: TransactionStatus.PENDING,
+      status: status || TransactionStatus.PENDING,
       fromWalletId,
       toWalletId: null,
       amount,
@@ -70,6 +80,7 @@ export default class TransactionService {
       description,
       txHash,
       network,
+      completedAt,
     })
     return transaction
   }
@@ -82,16 +93,23 @@ export default class TransactionService {
     toWalletId: number,
     amount: number,
     currency: string,
-    description?: string
+    description?: string,
+    completedAt?: DateTime,
+    status?: TransactionStatus,
+    txHash?: string,
+    network?: Network
   ): Promise<Transaction> {
     const transaction = await Transaction.create({
       type: TransactionType.TRANSFER,
-      status: TransactionStatus.PENDING,
+      status: status || TransactionStatus.PENDING,
       fromWalletId,
       toWalletId,
       amount,
       currency,
       description,
+      completedAt,
+      txHash,
+      network,
     })
 
     return transaction
@@ -172,9 +190,85 @@ export default class TransactionService {
   }
 
   async syncTransactions(address: string): Promise<void> {
-    const transactions = await this.client.getTransfers(address, {
+    const response = await this.client.getTransfers(address, {
       limit: 100,
     })
-    console.dir(transactions, { depth: null })
+    if (!response.success) {
+      throw new Error('Failed to get transactions')
+    }
+    const listTransactions = response.data
+    console.log(`Found ${listTransactions.length} transactions to sync`)
+
+    const wallet = await this.walletService.get_by_address(address)
+    if (!wallet) {
+      console.log(`Wallet not found for address ${address}`)
+      return
+    }
+    let synced = 0
+    let skipped = 0
+
+    console.log(listTransactions)
+    for (const transfer of listTransactions) {
+      if (transfer.Spl) {
+        const splTransfer = transfer.Spl as SplTransfer
+
+        if (splTransfer.mint !== USDC_MINT) {
+          continue
+        }
+        // Check if transaction already exists
+        const existingTx = await Transaction.query().where('tx_hash', splTransfer.signature).first()
+
+        if (existingTx) {
+          skipped++
+          continue
+        }
+
+        // Find the other wallet if it's an internal transfer
+        const otherAddress =
+          splTransfer.direction === 'inflow' ? splTransfer.from_address : splTransfer.to_address
+        const otherWallet = await this.walletService.get_by_address(otherAddress)
+
+        if (splTransfer.direction === 'inflow' && !otherWallet) {
+          await this.createDeposit(
+            wallet.id,
+            Number(splTransfer.ui_amount),
+            'usd',
+            `${splTransfer.mint.substring(0, 8)}...`,
+            TransactionStatus.COMPLETED,
+            splTransfer.confirmed_at ? DateTime.fromISO(splTransfer.confirmed_at) : undefined,
+            Network.SOLANA
+          )
+        } else if (splTransfer.direction === 'outflow' && !otherWallet) {
+          await this.createWithdraw(
+            wallet.id,
+            Number(splTransfer.ui_amount),
+            'usd',
+            `${splTransfer.mint.substring(0, 8)}...`,
+            TransactionStatus.COMPLETED,
+            splTransfer.confirmed_at ? DateTime.fromISO(splTransfer.confirmed_at) : undefined,
+            splTransfer.signature,
+            Network.SOLANA
+          )
+        } else if (otherWallet) {
+          await this.createTransfer(
+            splTransfer.direction === 'outflow' ? wallet.id : otherWallet.id,
+            splTransfer.direction === 'inflow' ? wallet.id : otherWallet.id,
+            Number(splTransfer.ui_amount),
+            'usd',
+            `${splTransfer.mint.substring(0, 8)}...`,
+            splTransfer.confirmed_at ? DateTime.fromISO(splTransfer.confirmed_at) : undefined,
+            TransactionStatus.COMPLETED,
+            splTransfer.signature,
+            Network.SOLANA
+          )
+        } else {
+          console.log(`Could not determine transaction type for ${splTransfer.signature}`)
+          continue
+        }
+        synced++
+      }
+    }
+
+    console.log(`Sync complete: ${synced} new transactions, ${skipped} skipped (already exist)`)
   }
 }
