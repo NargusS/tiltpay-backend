@@ -22,6 +22,7 @@ import {
   GetVirtualAccountsResponse,
   GetWalletAddressResponse,
   RequestKycLinkResponse,
+  TransferMoneyByAddressResponse,
   TransferMoneyByTagResponse,
 } from '#domains/wallet/types/wallet.response.types'
 import { ErrorResponse } from '#shared/error.types'
@@ -202,6 +203,7 @@ export default class WalletController {
   @ApiResponse({
     status: 201,
     description: 'Transfer money by address',
+    type: TransferMoneyByAddressResponse,
   })
   @ApiResponse({
     status: 400,

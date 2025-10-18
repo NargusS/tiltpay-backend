@@ -24,6 +24,15 @@ export class TransferMoneyByTagResponse {
   declare message: string
 }
 
+export class TransferMoneyByAddressResponse {
+  @ApiProperty({
+    description: 'The message of the transfer',
+    example: 'Money transferred successfully',
+    type: String,
+  })
+  declare message: string
+}
+
 export class CreateVirtualAccountResponse {
   @ApiProperty({
     description: 'The virtual account',
