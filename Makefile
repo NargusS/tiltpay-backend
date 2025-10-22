@@ -39,3 +39,8 @@ db-shell:
 
 clean:
 	docker-compose down -v
+
+
+deploy-image:
+	docker build -t ghcr.io/narguss/tiltpay:latest .
+	docker push ghcr.io/narguss/tiltpay:latest

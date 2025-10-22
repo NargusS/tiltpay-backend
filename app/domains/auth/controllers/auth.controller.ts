@@ -19,6 +19,7 @@ import { InvalidCredentialsException } from '#domains/user/exceptions/invalid_cr
 import { UnabledToVerifyException } from '#domains/auth/exceptions/unabled_to_verify.exception'
 import { ErrorResponse } from '#shared/error.types'
 import { MissmatchCodeException } from '../exceptions/missmatch_code.exception.js'
+import { MeResponse } from '#domains/auth/types/response.types'
 
 @ApiResponse({
   status: 500,
@@ -69,6 +70,7 @@ export default class AuthController {
       const token = generatedToken.value!.release()
       return response.status(200).json({ access_token: token })
     } catch (error) {
+      console.log(error)
       if (error instanceof UserNotVerifiedException) {
         return response.status(412).json({
           message: 'User not verified',
@@ -215,6 +217,41 @@ export default class AuthController {
     try {
       await auth.use('api').invalidateToken()
       return response.status(200).json({ message: 'Logout successful' })
+    } catch (error) {
+      return response.status(error.status).json({ message: error.message })
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Get user',
+    description: 'Get user',
+  })
+  @ApiHeader({
+    name: 'Authorization',
+    description: 'Bearer token',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User',
+    type: MeResponse,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    type: ErrorResponse,
+  })
+  async me({ auth, response }: HttpContext) {
+    try {
+      const user = auth.user!
+      return response.status(200).json({
+        id: user.id,
+        fullName: user.fullName,
+        tagname: user.tagname,
+        phoneNumber: user.phoneNumber,
+        verified: user.verified,
+        createdAt: user.createdAt,
+      })
     } catch (error) {
       return response.status(error.status).json({ message: error.message })
     }

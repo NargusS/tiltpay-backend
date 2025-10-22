@@ -21,6 +21,7 @@ router
     router.post('/login', [AuthController, 'login'])
     router.post('/create-account', [AuthController, 'createAccount'])
     router.post('/verify-account', [AuthController, 'verifyAccount'])
+    router.get('/me', [AuthController, 'me']).use(middleware.auth())
     router.post('/logout', [AuthController, 'logout']).use(middleware.auth())
   })
   .prefix('auth')
