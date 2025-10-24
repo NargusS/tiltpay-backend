@@ -11,7 +11,8 @@ import router from '@adonisjs/core/services/router'
 import openapi from '@foadonis/openapi/services/main'
 import { middleware } from './kernel.js'
 const TapToPayController = () => import('#domains/tap-to-pay/controllers/tap_to_pay.controller')
-
+const TransactionController = () =>
+  import('#domains/transaction/controllers/transaction.controller')
 openapi.registerRoutes()
 
 const AuthController = () => import('#domains/auth/controllers/auth.controller')
@@ -48,4 +49,11 @@ router
     router.post('/approve-request', [TapToPayController, 'approveTapToPayRequest'])
   })
   .prefix('tap-to-pay')
+  .use(middleware.auth())
+
+router
+  .group(() => {
+    router.get('/transactions', [TransactionController, 'getTransactions'])
+  })
+  .prefix('transaction')
   .use(middleware.auth())
