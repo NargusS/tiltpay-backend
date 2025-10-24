@@ -10,6 +10,7 @@
 import router from '@adonisjs/core/services/router'
 import openapi from '@foadonis/openapi/services/main'
 import { middleware } from './kernel.js'
+const TapToPayController = () => import('#domains/tap-to-pay/controllers/tap_to_pay.controller')
 
 openapi.registerRoutes()
 
@@ -38,4 +39,13 @@ router
     router.get('/kyc/:kyc_id', [WalletController, 'getKycStatus'])
   })
   .prefix('wallet')
+  .use(middleware.auth())
+
+router
+  .group(() => {
+    router.post('/create-request', [TapToPayController, 'createTapToPayRequest'])
+    router.post('/create-authorization', [TapToPayController, 'createTapToPayAuthorization'])
+    router.post('/approve-request', [TapToPayController, 'approveTapToPayRequest'])
+  })
+  .prefix('tap-to-pay')
   .use(middleware.auth())
