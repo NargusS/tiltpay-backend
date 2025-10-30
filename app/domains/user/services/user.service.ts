@@ -1,6 +1,7 @@
 import User from '#domains/user/models/user'
 import { UserNotFoundException } from '#domains/user/exceptions/user_not_found.exception'
 import { DateTime } from 'luxon'
+import { ListUsersResponse } from '#domains/user/types/response.types'
 
 export class UserService {
   constructor() {}
@@ -94,5 +95,16 @@ export class UserService {
       throw new UserNotFoundException('User not found')
     }
     await user.delete()
+  }
+
+  async list_all_users(): Promise<ListUsersResponse> {
+    const users = await User.all()
+    return {
+      users: users.map((user) => ({
+        id: user.id,
+        fullName: user.fullName,
+        tagname: user.tagname,
+      })),
+    }
   }
 }
