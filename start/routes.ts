@@ -66,3 +66,4 @@ router
     router.get('/users', [UsersController, 'findAll'])
   })
   .prefix('user')
+  .use(middleware.auth())
