@@ -17,7 +17,9 @@ import {
   SourceDepositInstructions,
 } from '#domains/wallet/types/wallet.types'
 import { MAP_CONTRACT_ADDRESS } from '#domains/wallet/constants/wallet.constants'
-import { Keypair } from '@solana/web3.js'
+import { Keypair, PublicKey } from '@solana/web3.js'
+import { getAssociatedTokenAddress } from '@solana/spl-token'
+import { SolanaService } from '#domains/transaction/services/solana.service'
 
 export interface TokenBalance {
   mint: string
@@ -44,6 +46,38 @@ export class WalletService {
     })
   }
 
+  /**
+   * Calcule l'adresse du token account USDC pour une adresse wallet donnée
+   */
+  async calculateUsdcTokenAccountAddress(walletAddress: string): Promise<string | null> {
+    const usdcMintAddress = env.get('USDC_MINT_ADDRESS')
+
+    try {
+      const walletPublicKey = new PublicKey(walletAddress)
+      const mintPublicKey = new PublicKey(usdcMintAddress)
+      const tokenAccountAddress = await getAssociatedTokenAddress(mintPublicKey, walletPublicKey)
+      return tokenAccountAddress.toBase58()
+    } catch (error) {
+      // Si l'adresse Grid n'est pas sur la courbe ed25519, on ne peut pas calculer l'ATA directement
+      // On essaie avec SolanaService qui gère ce cas
+      try {
+        const solanaService = new SolanaService()
+        const tokenAccountAddress = await solanaService.getTokenAccountAddress(
+          walletAddress,
+          usdcMintAddress
+        )
+        if (tokenAccountAddress) {
+          return tokenAccountAddress.toBase58()
+        }
+      } catch (innerError) {
+        // Si on ne peut toujours pas, on retourne null
+        console.warn('Could not calculate USDC token account address:', error)
+      }
+    }
+
+    return null
+  }
+
   async create(user_id: number): Promise<Wallet> {
     const primaryKey = Keypair.generate()
     const account = await this.client.createAccount({
@@ -52,6 +86,10 @@ export class WalletService {
     if (account.type !== 'signers') {
       throw new WrongAccountTypeException()
     }
+
+    // Calculer l'adresse du token account USDC
+    const usdcTokenAccountAddress = await this.calculateUsdcTokenAccountAddress(account.address)
+
     const wallet = await Wallet.create({
       publicKey: primaryKey.publicKey.toBase58(),
       privateKey: primaryKey.secretKey.toString(),
@@ -60,6 +98,7 @@ export class WalletService {
       tag: 'primary',
       address: account.address,
       gridUserId: account.grid_user_id,
+      usdcTokenAccountAddress: usdcTokenAccountAddress,
     })
     return wallet
   }
@@ -94,7 +133,9 @@ export class WalletService {
     }
   }
 
-  async get_address(user_id: number): Promise<string> {
+  async get_address(
+    user_id: number
+  ): Promise<{ address: string; usdcTokenAccountAddress: string | null }> {
     const wallet = await Wallet.query()
       .where('user_id', user_id)
       .where('provider', 'solana')
@@ -103,7 +144,23 @@ export class WalletService {
     if (!wallet) {
       throw new WalletNotFoundException()
     }
-    return wallet.address
+
+    let usdcTokenAccountAddress = wallet.usdcTokenAccountAddress
+
+    // Si on n'a pas encore l'adresse USDC, essayer de la calculer/récupérer
+    if (!usdcTokenAccountAddress) {
+      usdcTokenAccountAddress = await this.calculateUsdcTokenAccountAddress(wallet.address)
+
+      // Si on a réussi à calculer l'adresse, la sauvegarder
+      if (usdcTokenAccountAddress) {
+        await wallet.merge({ usdcTokenAccountAddress }).save()
+      }
+    }
+
+    return {
+      address: wallet.address,
+      usdcTokenAccountAddress: usdcTokenAccountAddress,
+    }
   }
 
   private parsePrivateKey(privateKeyString: string): Uint8Array {
@@ -282,5 +339,23 @@ export class WalletService {
       )
       .map((depositInstructions: VirtualAccount) => depositInstructions.source_deposit_instructions)
     return sourceDepositInstructions
+  }
+
+  /**
+   * Met à jour l'adresse du token account USDC pour un wallet existant
+   */
+  async updateUsdcTokenAccountAddress(walletId: number): Promise<string | null> {
+    const wallet = await Wallet.find(walletId)
+    if (!wallet) {
+      throw new WalletNotFoundException()
+    }
+
+    const usdcTokenAccountAddress = await this.calculateUsdcTokenAccountAddress(wallet.address)
+
+    if (usdcTokenAccountAddress) {
+      await wallet.merge({ usdcTokenAccountAddress }).save()
+    }
+
+    return usdcTokenAccountAddress
   }
 }

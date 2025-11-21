@@ -32,4 +32,5 @@ export default await Env.create(new URL('../', import.meta.url), {
   GRID_ENVIRONMENT: Env.schema.string(),
   APP_URL: Env.schema.string(),
   SOLANA_RPC_URL: Env.schema.string(),
+  USDC_MINT_ADDRESS: Env.schema.string(),
 })

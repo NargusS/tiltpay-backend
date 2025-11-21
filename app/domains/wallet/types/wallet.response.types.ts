@@ -8,11 +8,19 @@ import {
 
 export class GetWalletAddressResponse {
   @ApiProperty({
-    description: 'The address of the wallet',
-    example: 'solana_address',
+    description: 'The address of the wallet (Grid address)',
+    example: '7T7o7CXekdSeW2743g7SwowsfzJyytJcufYfz9LUvm2J',
     type: String,
   })
   declare address: string
+
+  @ApiProperty({
+    description: 'The USDC token account address for receiving USDC tokens',
+    example: 'ABC123...',
+    type: String,
+    nullable: true,
+  })
+  declare usdcTokenAccountAddress: string | null
 }
 
 export class TransferMoneyByTagResponse {

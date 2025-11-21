@@ -102,10 +102,11 @@ export default class WalletController {
     try {
       logger.info(`Fetching wallet address for user ${auth.user!.id}`)
       const user = auth.user!
-      const address = await this.wallet_service.get_address(user.id)
+      const addresses = await this.wallet_service.get_address(user.id)
       logger.info(`Wallet address for user ${user.id} fetched successfully`)
       return response.status(200).json({
-        address: address,
+        address: addresses.address,
+        usdcTokenAccountAddress: addresses.usdcTokenAccountAddress,
       })
     } catch (error) {
       if (error instanceof WalletNotFoundException) {
@@ -222,8 +223,8 @@ export default class WalletController {
       logger.info(
         `Transferring money by address for user ${userId} to address ${address} with amount ${amount}`
       )
-      const userAddress = await this.wallet_service.get_address(userId)
-      if (userAddress === address) {
+      const userAddresses = await this.wallet_service.get_address(userId)
+      if (userAddresses.address === address) {
         throw new UserSelfTransferException()
       }
       await this.wallet_service.transfer_to_address(userId, address, amount)

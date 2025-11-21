@@ -28,6 +28,9 @@ export default class Wallet extends BaseModel {
   @column()
   declare address: string
 
+  @column({ columnName: 'usdc_token_account_address' })
+  declare usdcTokenAccountAddress: string | null
+
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
 
