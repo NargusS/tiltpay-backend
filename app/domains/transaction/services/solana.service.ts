@@ -86,17 +86,34 @@ export class SolanaService {
 
   /**
    * Récupère l'historique des transactions pour un token spécifique
+   * @param walletAddress - Adresse du wallet
+   * @param tokenMint - Adresse du mint du token
+   * @param limit - Nombre maximum de transactions à récupérer
+   * @param tokenAccountAddress - Adresse du token account (optionnel, sera calculée si non fournie)
    */
   async getTokenTransactionHistory(
     walletAddress: string,
     tokenMint: string,
-    limit: number = 100
+    limit: number = 100,
+    tokenAccountAddress?: string | null
   ): Promise<TokenTransaction[]> {
     try {
-      // Obtenir l'adresse du token account
-      const tokenAccountAddress = await this.getTokenAccountAddress(walletAddress, tokenMint)
+      // Utiliser l'adresse fournie ou la calculer
+      let tokenAccountPubkey: PublicKey | null = null
 
-      if (!tokenAccountAddress) {
+      if (tokenAccountAddress) {
+        try {
+          tokenAccountPubkey = new PublicKey(tokenAccountAddress)
+        } catch {
+          // Si l'adresse fournie n'est pas valide, on la calcule
+          tokenAccountPubkey = await this.getTokenAccountAddress(walletAddress, tokenMint)
+        }
+      } else {
+        // Obtenir l'adresse du token account
+        tokenAccountPubkey = await this.getTokenAccountAddress(walletAddress, tokenMint)
+      }
+
+      if (!tokenAccountPubkey) {
         // Si on ne peut pas trouver le token account, essayer de chercher directement
         // les transactions pour l'adresse fournie (peut-être que c'est déjà un token account)
         try {
@@ -121,14 +138,14 @@ export class SolanaService {
       }
 
       // Vérifier que le token account existe
-      const tokenAccountInfo = await this.connection.getAccountInfo(tokenAccountAddress)
+      const tokenAccountInfo = await this.connection.getAccountInfo(tokenAccountPubkey)
       if (!tokenAccountInfo) {
         return []
       }
 
       // Récupérer les transactions pour ce token account
       return await this.fetchTransactionsForAddress(
-        tokenAccountAddress,
+        tokenAccountPubkey,
         walletAddress,
         tokenMint,
         limit

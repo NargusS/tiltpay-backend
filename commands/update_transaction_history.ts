@@ -39,6 +39,7 @@ export default class UpdateTransactionHistory extends BaseCommand {
     try {
       // Déterminer si c'est une adresse ou un ID utilisateur
       let walletAddress: string
+      let usdcTokenAccountAddress: string | null = null
 
       if (walletIdentifier.startsWith('0x') || walletIdentifier.length > 30) {
         // C'est probablement une adresse
@@ -65,7 +66,11 @@ export default class UpdateTransactionHistory extends BaseCommand {
         }
 
         walletAddress = wallet.address
+        usdcTokenAccountAddress = wallet.usdcTokenAccountAddress
         this.logger.info(`Adresse du wallet trouvée: ${walletAddress}`)
+        if (usdcTokenAccountAddress) {
+          this.logger.info(`Adresse USDC token account trouvée: ${usdcTokenAccountAddress}`)
+        }
       }
 
       // Vérifier si le token mint est dans la liste des tokens connus
@@ -74,12 +79,13 @@ export default class UpdateTransactionHistory extends BaseCommand {
         this.logger.info(`Token trouvé: ${tokenInfo.name} (${tokenInfo.symbol})`)
       }
 
-      // Récupérer l'historique des transactions
+      // Récupérer l'historique des transactions en utilisant l'adresse stockée si disponible
       const solanaService = new SolanaService()
       const transactions = await solanaService.getTokenTransactionHistory(
         walletAddress,
         tokenMintAddress,
-        limit
+        limit,
+        usdcTokenAccountAddress
       )
 
       this.logger.info(`\n${transactions.length} transaction(s) trouvée(s):\n`)
