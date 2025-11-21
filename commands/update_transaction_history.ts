@@ -104,12 +104,17 @@ export default class UpdateTransactionHistory extends BaseCommand {
         this.logger.info(`  Type: ${tx.type}`)
         this.logger.info(`  Montant: ${type}${amount}`)
         this.logger.info(`  De (adresse Solana): ${tx.from}`)
-        if (tx.fromTokenAccount && tx.fromTokenAccount !== tx.from) {
-          this.logger.info(`  FromTokenAccount (adresse Solana): ${tx.fromTokenAccount}`)
+        if (tx.fromTokenAccount) {
+          this.logger.info(`  FromTokenAccount (adresse token account): ${tx.fromTokenAccount}`)
         }
         this.logger.info(`  Vers (adresse Solana): ${tx.to}`)
-        if (tx.toTokenAccount && tx.toTokenAccount !== tx.to) {
-          this.logger.info(`  ToTokenAccount (adresse Solana): ${tx.toTokenAccount}`)
+        if (tx.toTokenAccount) {
+          this.logger.info(`  ToTokenAccount (adresse token account): ${tx.toTokenAccount}`)
+        }
+        if (tx.trackedTokenAccount) {
+          this.logger.info(
+            `  TrackedTokenAccount (adresse token account): ${tx.trackedTokenAccount}`
+          )
         }
       })
 

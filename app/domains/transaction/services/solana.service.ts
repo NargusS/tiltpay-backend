@@ -14,8 +14,9 @@ export interface TokenTransaction {
   type: 'debit' | 'credit'
   from: string // Adresse Solana originale de l'expéditeur (owner du token account)
   to: string // Adresse Solana originale du destinataire (owner du token account)
-  fromTokenAccount?: string // Token account address de l'expéditeur
-  toTokenAccount?: string // Token account address du destinataire
+  fromTokenAccount?: string // Adresse du token account de l'expéditeur
+  toTokenAccount?: string // Adresse du token account du destinataire
+  trackedTokenAccount?: string // Adresse du token account qu'on track
   mint: string
   decimals: number
 }
@@ -273,6 +274,22 @@ export class SolanaService {
     let fromTokenAccount: string | undefined
     let toTokenAccount: string | undefined
 
+    // Obtenir l'adresse du token account qu'on track
+    let trackedTokenAccountAddress: string | undefined
+    if (
+      trackedAccountIndex !== undefined &&
+      trackedAccountIndex !== -1 &&
+      transaction.transaction.message.accountKeys
+    ) {
+      const trackedKey = transaction.transaction.message.accountKeys[trackedAccountIndex]
+      if (trackedKey) {
+        trackedTokenAccountAddress =
+          typeof trackedKey === 'string' ? trackedKey : trackedKey.pubkey.toBase58()
+      }
+    } else {
+      trackedTokenAccountAddress = tokenAccountAddress
+    }
+
     // Pour les crédits, trouver le token account source qui a diminué (pas celui qu'on track)
     if (type === 'credit') {
       // Chercher un token account qui a diminué (source) et qui n'est pas celui qu'on track
@@ -291,11 +308,22 @@ export class SolanaService {
       if (sourceBalance && sourceBalance.owner) {
         // L'owner est directement dans le token balance
         fromAddress = sourceBalance.owner
-        fromTokenAccount = sourceBalance.owner // Adresse Solana originale de l'expéditeur
+
+        // Obtenir l'adresse du token account source depuis accountIndex
+        if (
+          sourceBalance.accountIndex !== undefined &&
+          transaction.transaction.message.accountKeys
+        ) {
+          const sourceKey = transaction.transaction.message.accountKeys[sourceBalance.accountIndex]
+          if (sourceKey) {
+            fromTokenAccount =
+              typeof sourceKey === 'string' ? sourceKey : sourceKey.pubkey.toBase58()
+          }
+        }
       }
       // Le destinataire est le wallet qu'on track
       toAddress = walletAddress
-      toTokenAccount = walletAddress
+      toTokenAccount = trackedTokenAccountAddress
     }
 
     // Pour les débits, trouver le token account destination qui a augmenté (pas celui qu'on track)
@@ -316,11 +344,18 @@ export class SolanaService {
       if (destBalance && destBalance.owner) {
         // L'owner est directement dans le token balance
         toAddress = destBalance.owner
-        toTokenAccount = destBalance.owner // Adresse Solana originale du destinataire
+
+        // Obtenir l'adresse du token account destination depuis accountIndex
+        if (destBalance.accountIndex !== undefined && transaction.transaction.message.accountKeys) {
+          const destKey = transaction.transaction.message.accountKeys[destBalance.accountIndex]
+          if (destKey) {
+            toTokenAccount = typeof destKey === 'string' ? destKey : destKey.pubkey.toBase58()
+          }
+        }
       }
       // L'expéditeur est le wallet qu'on track
       fromAddress = walletAddress
-      fromTokenAccount = walletAddress
+      fromTokenAccount = trackedTokenAccountAddress
     }
 
     // Fallback: utiliser les instructions si on n'a pas trouvé les owners
@@ -353,11 +388,15 @@ export class SolanaService {
               )
               if (destBalance && destBalance.owner) {
                 toAddress = destBalance.owner
-                toTokenAccount = destBalance.owner // Adresse Solana originale
+                toTokenAccount = parsedInfo.destination // Adresse du token account
               } else {
                 toAddress = parsedInfo.destination
                 toTokenAccount = parsedInfo.destination
               }
+            }
+            // Si on a une source dans l'instruction, l'utiliser aussi
+            if (parsedInfo.source && !fromTokenAccount) {
+              fromTokenAccount = parsedInfo.source
             }
             break
           }
@@ -374,6 +413,7 @@ export class SolanaService {
       to: toAddress,
       fromTokenAccount,
       toTokenAccount,
+      trackedTokenAccount: trackedTokenAccountAddress,
       mint: tokenMint,
       decimals,
     }
