@@ -85,6 +85,109 @@ export class SolanaService {
   }
 
   /**
+   * Récupère les signatures pour une adresse (wallet ou token account)
+   * Cette méthode est pensée pour l’indexation en base (job léger).
+   */
+  async getSignaturesForAddress(
+    address: string,
+    options?: {
+      limit?: number
+      before?: string
+      until?: string
+    }
+  ): Promise<ConfirmedSignatureInfo[]> {
+    const pubkey = new PublicKey(address)
+
+    return this.connection.getSignaturesForAddress(pubkey, {
+      limit: options?.limit,
+      before: options?.before,
+      until: options?.until,
+    })
+  }
+
+  /**
+   * Récupère et parse les transactions pour une liste de signatures
+   * à partir du point de vue d’un wallet + token account donné.
+   * Cette méthode est pensée pour les jobs d’enrichissement (fetch en batch).
+   */
+  async getParsedTokenTransactionsForSignatures(
+    walletAddress: string,
+    tokenMint: string,
+    tokenAccountAddress: string,
+    signatures: ConfirmedSignatureInfo[]
+  ): Promise<TokenTransaction[]> {
+    if (signatures.length === 0) {
+      return []
+    }
+
+    const signatureStrings = signatures.map((s) => s.signature)
+
+    const parsedTransactions = await this.connection.getParsedTransactions(signatureStrings, {
+      maxSupportedTransactionVersion: 0,
+    })
+
+    const result: TokenTransaction[] = []
+
+    for (const [index, tx] of parsedTransactions.entries()) {
+      const sigInfo = signatures[index]
+
+      if (!tx || !tx.meta) {
+        continue
+      }
+
+      const parsedTx = this.parseTokenTransaction(
+        tx,
+        walletAddress,
+        tokenMint,
+        tokenAccountAddress,
+        sigInfo
+      )
+
+      if (parsedTx) {
+        result.push(parsedTx)
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Récupère et parse les transactions pour une liste de signatures
+   * en vue globale (sans point de vue spécifique de wallet).
+   * Utile pour stocker une seule ligne par transaction on-chain.
+   */
+  async getGlobalTokenTransactionsForSignatures(
+    tokenMint: string,
+    signatures: string[]
+  ): Promise<TokenTransaction[]> {
+    if (signatures.length === 0) {
+      return []
+    }
+
+    const parsedTransactions = await this.connection.getParsedTransactions(signatures, {
+      maxSupportedTransactionVersion: 0,
+    })
+
+    const result: TokenTransaction[] = []
+
+    for (const [index, tx] of parsedTransactions.entries()) {
+      const signature = signatures[index]
+
+      if (!tx || !tx.meta) {
+        continue
+      }
+
+      const parsedTx = this.parseGlobalTokenTransaction(tx, tokenMint, signature)
+
+      if (parsedTx) {
+        result.push(parsedTx)
+      }
+    }
+
+    return result
+  }
+
+  /**
    * Récupère l'historique des transactions pour un token spécifique
    * @param walletAddress - Adresse du wallet
    * @param tokenMint - Adresse du mint du token
@@ -431,6 +534,145 @@ export class SolanaService {
       fromTokenAccount,
       toTokenAccount,
       trackedTokenAccount: trackedTokenAccountAddress,
+      mint: tokenMint,
+      decimals,
+    }
+  }
+
+  /**
+   * Parse une transaction de manière globale (sans wallet suivi)
+   * pour extraire from/to, les token accounts et le montant.
+   */
+  private parseGlobalTokenTransaction(
+    transaction: ParsedTransactionWithMeta,
+    tokenMint: string,
+    signature: string
+  ): TokenTransaction | null {
+    if (!transaction.meta || !transaction.transaction) {
+      return null
+    }
+
+    const preBalances = transaction.meta.preTokenBalances || []
+    const postBalances = transaction.meta.postTokenBalances || []
+
+    // Ne garder que les balances pour le mint concerné
+    type AccountBalance = {
+      pre: number
+      post: number
+      owner: string
+      decimals: number
+    }
+
+    const accounts = new Map<number, AccountBalance>()
+
+    for (const bal of preBalances) {
+      if (bal.mint !== tokenMint || bal.accountIndex === undefined || !bal.uiTokenAmount) {
+        continue
+      }
+      const amount = Number.parseFloat(bal.uiTokenAmount.uiAmountString || '0')
+      const decimals = bal.uiTokenAmount.decimals ?? 0
+      accounts.set(bal.accountIndex, {
+        pre: amount,
+        post: 0,
+        owner: bal.owner ?? '',
+        decimals,
+      })
+    }
+
+    for (const bal of postBalances) {
+      if (bal.mint !== tokenMint || bal.accountIndex === undefined || !bal.uiTokenAmount) {
+        continue
+      }
+      const amount = Number.parseFloat(bal.uiTokenAmount.uiAmountString || '0')
+      const decimals = bal.uiTokenAmount.decimals ?? 0
+      const existing = accounts.get(bal.accountIndex)
+      if (existing) {
+        existing.post = amount
+        if (!existing.owner && bal.owner) {
+          existing.owner = bal.owner
+        }
+        if (!existing.decimals && decimals) {
+          existing.decimals = decimals
+        }
+      } else {
+        accounts.set(bal.accountIndex, {
+          pre: 0,
+          post: amount,
+          owner: bal.owner ?? '',
+          decimals,
+        })
+      }
+    }
+
+    if (accounts.size === 0) {
+      return null
+    }
+
+    // Trouver la plus grande sortie (delta négatif) et la plus grande entrée (delta positif)
+    let sourceIndex: number | null = null
+    let destIndex: number | null = null
+    let maxNegativeDelta = 0
+    let maxPositiveDelta = 0
+    let decimals = 0
+
+    for (const [index, bal] of accounts.entries()) {
+      const delta = bal.post - bal.pre
+      decimals = bal.decimals
+
+      if (delta < maxNegativeDelta) {
+        maxNegativeDelta = delta
+        sourceIndex = index
+      }
+
+      if (delta > maxPositiveDelta) {
+        maxPositiveDelta = delta
+        destIndex = index
+      }
+    }
+
+    if (sourceIndex === null || destIndex === null || maxPositiveDelta === 0) {
+      return null
+    }
+
+    const source = accounts.get(sourceIndex)!
+    const dest = accounts.get(destIndex)!
+
+    const amountUi = Math.min(-maxNegativeDelta, maxPositiveDelta)
+    const amount = Math.round(amountUi * Math.pow(10, decimals))
+
+    if (amount === 0) {
+      return null
+    }
+
+    // Récupérer les adresses des token accounts
+    let fromTokenAccount: string | undefined
+    let toTokenAccount: string | undefined
+
+    if (transaction.transaction.message.accountKeys) {
+      const accountKeys = transaction.transaction.message.accountKeys
+
+      const resolveKey = (idx: number): string | undefined => {
+        const key = accountKeys[idx]
+        if (!key) {
+          return undefined
+        }
+        return typeof key === 'string' ? key : key.pubkey.toBase58()
+      }
+
+      fromTokenAccount = resolveKey(sourceIndex)
+      toTokenAccount = resolveKey(destIndex)
+    }
+
+    return {
+      signature,
+      blockTime: transaction.blockTime ?? null,
+      amount,
+      type: 'debit', // globalement, on considère le point de vue de la source
+      from: source.owner,
+      to: dest.owner,
+      fromTokenAccount,
+      toTokenAccount,
+      trackedTokenAccount: undefined,
       mint: tokenMint,
       decimals,
     }
