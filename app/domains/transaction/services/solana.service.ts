@@ -152,6 +152,26 @@ export class SolanaService {
   }
 
   /**
+   * Récupère et parse une transaction pour une signature
+   * en vue globale (sans point de vue spécifique de wallet).
+   * Utile pour stocker une seule ligne par transaction on-chain.
+   */
+  async getGlobalTokenTransactionForSignature(
+    tokenMint: string,
+    signature: string
+  ): Promise<TokenTransaction | null> {
+    const parsedTransaction = await this.connection.getParsedTransaction(signature, {
+      maxSupportedTransactionVersion: 0,
+    })
+
+    if (!parsedTransaction || !parsedTransaction.meta) {
+      return null
+    }
+
+    return this.parseGlobalTokenTransaction(parsedTransaction, tokenMint, signature)
+  }
+
+  /**
    * Récupère et parse les transactions pour une liste de signatures
    * en vue globale (sans point de vue spécifique de wallet).
    * Utile pour stocker une seule ligne par transaction on-chain.

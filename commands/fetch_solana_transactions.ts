@@ -3,6 +3,7 @@ import type { CommandOptions } from '@adonisjs/core/types/ace'
 import { SolanaService } from '#domains/transaction/services/solana.service'
 import TokenTransaction from '#domains/transaction/models/token_transaction'
 import { JobLockService } from '#domains/job/services/job_lock.service'
+import { SolanaRateLimiterService } from '#domains/job/services/solana_rate_limiter.service'
 import { DateTime } from 'luxon'
 
 export default class FetchSolanaTransactions extends BaseCommand {
@@ -26,7 +27,7 @@ export default class FetchSolanaTransactions extends BaseCommand {
     this.logger.info('Démarrage du fetch des transactions Solana...')
 
     const solanaService = new SolanaService()
-    const BATCH_SIZE = 50
+    const BATCH_SIZE = 20 // Nombre total de transactions à traiter
 
     try {
       const toProcess = await TokenTransaction.query()
@@ -39,48 +40,45 @@ export default class FetchSolanaTransactions extends BaseCommand {
         return
       }
 
-      // Construire un mapping signature -> row DB
-      const rowsBySignature = new Map<string, (typeof toProcess)[number]>()
-      for (const row of toProcess) {
-        rowsBySignature.set(row.signature, row)
-      }
-
-      const signatures = toProcess.map((row) => row.signature)
       const mint = toProcess[0].mint
 
-      const parsedTransactions = await solanaService.getGlobalTokenTransactionsForSignatures(
-        mint,
-        signatures
-      )
-
-      for (const parsedTx of parsedTransactions) {
-        const row = rowsBySignature.get(parsedTx.signature)
-        if (!row) {
-          continue
-        }
-
-        row.amount = String(parsedTx.amount)
-        row.decimals = parsedTx.decimals
-        row.type = parsedTx.type
-        row.fromAddress = parsedTx.from
-        row.toAddress = parsedTx.to
-        row.fromTokenAccount = parsedTx.fromTokenAccount || null
-        row.toTokenAccount = parsedTx.toTokenAccount || null
-        row.blockTime =
-          parsedTx.blockTime !== null ? DateTime.fromSeconds(parsedTx.blockTime) : row.blockTime
-        row.raw = null
-        row.status = 'fetched'
-        row.error = null
-
-        await row.save()
-      }
-
-      // Marquer les lignes sans parsedTx comme failed
-      const parsedSignatures = new Set(parsedTransactions.map((tx) => tx.signature))
+      // Traiter chaque transaction une par une avec rate limiting
       for (const row of toProcess) {
-        if (!parsedSignatures.has(row.signature)) {
+        // Attendre avant chaque requête RPC pour respecter le rate limit partagé
+        await SolanaRateLimiterService.waitIfNeeded()
+
+        try {
+          const parsedTx = await solanaService.getGlobalTokenTransactionForSignature(
+            mint,
+            row.signature
+          )
+
+          if (!parsedTx) {
+            row.status = 'failed'
+            row.error = 'Could not parse transaction'
+            await row.save()
+            continue
+          }
+
+          row.amount = String(parsedTx.amount)
+          row.decimals = parsedTx.decimals
+          row.fromAddress = parsedTx.from
+          row.toAddress = parsedTx.to
+          row.fromTokenAccount = parsedTx.fromTokenAccount || null
+          row.toTokenAccount = parsedTx.toTokenAccount || null
+          row.blockTime =
+            parsedTx.blockTime !== null ? DateTime.fromSeconds(parsedTx.blockTime) : row.blockTime
+          row.raw = null
+          row.status = 'fetched'
+          row.error = null
+
+          await row.save()
+        } catch (error: any) {
+          this.logger.error(
+            `Erreur lors du fetch de la transaction ${row.signature}: ${error.message}`
+          )
           row.status = 'failed'
-          row.error = row.error || 'No meta or could not parse transaction'
+          row.error = error.message || 'Error fetching transaction'
           await row.save()
         }
       }

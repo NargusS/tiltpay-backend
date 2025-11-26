@@ -29,9 +29,6 @@ export default class TokenTransaction extends BaseModel {
   @column()
   declare decimals?: number | null
 
-  @column()
-  declare type?: 'debit' | 'credit' | null
-
   @column({ columnName: 'from_address' })
   declare fromAddress?: string | null
 

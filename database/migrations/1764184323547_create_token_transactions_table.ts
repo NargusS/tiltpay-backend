@@ -18,7 +18,6 @@ export default class extends BaseSchema {
 
       table.bigInteger('amount').nullable()
       table.integer('decimals').nullable()
-      table.enum('type', ['debit', 'credit']).nullable()
       table.string('from_address').nullable()
       table.string('to_address').nullable()
       table.string('from_token_account').nullable()

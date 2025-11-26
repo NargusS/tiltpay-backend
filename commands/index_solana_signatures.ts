@@ -4,6 +4,7 @@ import env from '#start/env'
 import Wallet from '#domains/wallet/models/wallet.model'
 import TokenTransaction from '#domains/transaction/models/token_transaction'
 import { SolanaService } from '#domains/transaction/services/solana.service'
+import { SolanaRateLimiterService } from '#domains/job/services/solana_rate_limiter.service'
 import { DateTime } from 'luxon'
 
 export default class IndexSolanaSignatures extends BaseCommand {
@@ -28,7 +29,11 @@ export default class IndexSolanaSignatures extends BaseCommand {
       return
     }
 
-    for (const wallet of wallets) {
+    // Traiter jusqu'à 30 wallets par exécution (pour rester sous 35 req/10s)
+    const MAX_WALLETS_PER_RUN = 30
+    const walletsToProcess = wallets.slice(0, MAX_WALLETS_PER_RUN)
+
+    for (const wallet of walletsToProcess) {
       if (!wallet.usdcTokenAccountAddress) {
         this.logger.info(
           `Wallet ${wallet.id} (${wallet.address}) sans usdcTokenAccountAddress, ignoré.`
@@ -38,7 +43,10 @@ export default class IndexSolanaSignatures extends BaseCommand {
 
       this.logger.info(`Indexation des signatures pour le wallet ${wallet.id}...`)
 
-      const limit = 1000
+      const limit = 100
+
+      // Attendre avant chaque requête RPC pour respecter le rate limit
+      await SolanaRateLimiterService.waitIfNeeded()
 
       const signatures = await solanaService.getSignaturesForAddress(
         wallet.usdcTokenAccountAddress,
