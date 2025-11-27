@@ -44,3 +44,5 @@ clean:
 deploy-image:
 	docker build -t ghcr.io/narguss/tiltpay:latest .
 	docker push ghcr.io/narguss/tiltpay:latest
+	docker build -t ghcr.io/narguss/tiltpay-scheduler:latest -f Dockerfile.scheduler .
+	docker push ghcr.io/narguss/tiltpay-scheduler:latest
