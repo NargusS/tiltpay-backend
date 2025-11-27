@@ -1,9 +1,9 @@
 import { HttpContext } from '@adonisjs/core/http'
 import { ApiHeader, ApiOperation, ApiResponse } from '@foadonis/openapi/decorators'
-import { DateTime } from 'luxon'
 import { ErrorResponse } from '#shared/error.types'
 import { TransactionResponse } from '#domains/transaction/types/response.types'
-
+import TransactionService from '../services/transaction.service.js'
+import { WalletService } from '#domains/wallet/services/wallet.service'
 @ApiHeader({
   name: 'Authorization',
   description: 'Bearer token',
@@ -20,7 +20,10 @@ import { TransactionResponse } from '#domains/transaction/types/response.types'
   type: ErrorResponse,
 })
 export default class TransactionController {
-  constructor() {}
+  constructor(
+    private transactionService: TransactionService,
+    private walletService: WalletService
+  ) {}
 
   @ApiOperation({
     summary: 'Get transactions',
@@ -31,47 +34,10 @@ export default class TransactionController {
     description: 'Transactions',
     type: TransactionResponse,
   })
-  async getTransactions({ response }: HttpContext) {
-    const now = DateTime.now()
-    return response.status(200).json({
-      transactions: [
-        {
-          id: 1,
-          amount: 7120000,
-          name: 'Uber eats',
-          type: 'debit',
-          currency: 'usd',
-          status: 'completed',
-          createdAt: now.minus({ days: 1 }).toISO(),
-        },
-        {
-          id: 2,
-          amount: 649340000,
-          name: 'Sling Money',
-          type: 'credit',
-          currency: 'usd',
-          status: 'completed',
-          createdAt: now.minus({ days: 2 }).toISO(),
-        },
-        {
-          id: 3,
-          amount: 1467210000,
-          name: 'Walmart',
-          type: 'debit',
-          currency: 'usd',
-          status: 'completed',
-          createdAt: now.minus({ days: 7 }).toISO(),
-        },
-        {
-          id: 4,
-          amount: 1420000,
-          name: 'Interest Earnings',
-          type: 'credit',
-          currency: 'usd',
-          status: 'completed',
-          createdAt: now.minus({ days: 10 }).toISO(),
-        },
-      ],
-    })
+  async getTransactions({ auth, response }: HttpContext) {
+    const user = auth.user!
+    const wallet = await this.walletService.get_address(user.id)
+    const transactions = await this.transactionService.getTransactions(wallet.address)
+    return response.status(200).json({ transactions })
   }
 }
