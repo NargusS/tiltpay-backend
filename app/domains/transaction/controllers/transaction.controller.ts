@@ -4,6 +4,7 @@ import { ErrorResponse } from '#shared/error.types'
 import { TransactionResponse } from '#domains/transaction/types/response.types'
 import TransactionService from '../services/transaction.service.js'
 import { WalletService } from '#domains/wallet/services/wallet.service'
+import { inject } from '@adonisjs/core'
 @ApiHeader({
   name: 'Authorization',
   description: 'Bearer token',
@@ -19,6 +20,7 @@ import { WalletService } from '#domains/wallet/services/wallet.service'
   description: 'Internal server error',
   type: ErrorResponse,
 })
+@inject()
 export default class TransactionController {
   constructor(
     private transactionService: TransactionService,
